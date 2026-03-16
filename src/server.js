@@ -7,10 +7,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin1234';
 const JSONBIN_KEY = process.env.JSONBIN_KEY || '';
-const JSONBIN_ID = process.env.JSONBIN_ID || '';
+const JSONBIN_ID  = process.env.JSONBIN_ID  || '';
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // ─── IN-MEMORY STORE ─────────────────────────────────────────────────────────
@@ -22,7 +22,7 @@ let db = {
 let dbLoaded = false;
 let savePending = false;
 
-// ─── JSONBIN PERSISTENCE ──────────────────────────────────────────────────────
+// ─── JSONBIN ──────────────────────────────────────────────────────────────────
 function jsonbinRequest(method, data) {
   return new Promise((resolve, reject) => {
     if (!JSONBIN_KEY || !JSONBIN_ID) { dbLoaded = true; return resolve(null); }
@@ -77,10 +77,22 @@ function getClientIP(req) {
 }
 
 // ─── POST /api/submit ─────────────────────────────────────────────────────────
+// Accepts full rich payload from SP leaderboard service
 app.post('/api/submit', (req, res) => {
-  const { username, timeSpentMs, date, allowRejoin } = req.body;
-  if (!username || timeSpentMs === undefined)
-    return res.status(400).json({ error: 'username and timeSpentMs required' });
+  const {
+    username, date, submittedAt, allowRejoin,
+    // Core time
+    todayMs, totalAllTimeMs, dailyMs,
+    // Stats
+    stats,
+    // Current session
+    currentTask, currentProjectId,
+    // Full data
+    tasks, projects, tags, simpleCounters, miscConfig,
+  } = req.body;
+
+  if (!username || todayMs === undefined)
+    return res.status(400).json({ error: 'username and todayMs required' });
 
   const ip = getClientIP(req);
   const today = date || new Date().toISOString().split('T')[0];
@@ -90,16 +102,45 @@ app.post('/api/submit', (req, res) => {
 
   if (allowRejoin) db.deletedIPs = (db.deletedIPs || []).filter(i => i !== ip);
 
+  // Block duplicate IPs with different username
   const conflict = Object.values(db.users).find(u => u.ip === ip && u.username !== username);
   if (conflict) return res.status(409).json({ error: 'ip_conflict' });
 
-  if (!db.users[username]) {
-    db.users[username] = { username, ip, totalMs: 0, dailyMs: {}, lastSeen: today, joinedAt: new Date().toISOString() };
-  }
-  db.users[username].ip = ip;
-  db.users[username].dailyMs[today] = timeSpentMs;
-  db.users[username].totalMs = Object.values(db.users[username].dailyMs).reduce((a, b) => a + b, 0);
-  db.users[username].lastSeen = today;
+  const existing = db.users[username] || {};
+
+  db.users[username] = {
+    // Identity
+    username,
+    ip,
+    joinedAt: existing.joinedAt || new Date().toISOString(),
+    lastSeen: submittedAt || new Date().toISOString(),
+
+    // Time data — merge dailyMs (keep max per day in case of clock issues)
+    dailyMs: { ...(existing.dailyMs || {}), ...(dailyMs || {}) },
+    todayMs: todayMs || 0,
+    totalAllTimeMs: totalAllTimeMs || 0,
+
+    // Stats snapshot
+    stats: stats || {},
+
+    // Current session (live)
+    currentTask: currentTask || null,
+    currentProjectId: currentProjectId || null,
+    isOnline: true,
+    lastOnlineAt: new Date().toISOString(),
+
+    // Rich data — latest snapshot
+    tasks: tasks || [],
+    projects: projects || [],
+    tags: tags || [],
+    simpleCounters: simpleCounters || [],
+    miscConfig: miscConfig || {},
+  };
+
+  // Recalculate totalMs from merged dailyMs
+  db.users[username].totalAllTimeMs = Object.values(db.users[username].dailyMs)
+    .reduce((a, b) => a + b, 0);
+
   saveData();
   res.json({ success: true });
 });
@@ -107,13 +148,41 @@ app.post('/api/submit', (req, res) => {
 // ─── GET /api/leaderboard ─────────────────────────────────────────────────────
 app.get('/api/leaderboard', (req, res) => {
   const today = new Date().toISOString().split('T')[0];
-  const users = Object.values(db.users).map(u => ({
-    username: u.username, totalMs: u.totalMs,
-    todayMs: u.dailyMs[today] || 0, dailyMs: u.dailyMs,
-    lastSeen: u.lastSeen, joinedAt: u.joinedAt
-  }));
+  const now = Date.now();
+
+  const users = Object.values(db.users).map(u => {
+    // Mark offline if last seen > 3 min ago
+    const lastOnline = u.lastOnlineAt ? new Date(u.lastOnlineAt).getTime() : 0;
+    const isOnline = (now - lastOnline) < 3 * 60 * 1000;
+
+    return {
+      // Public fields only
+      username: u.username,
+      todayMs: u.todayMs || u.dailyMs?.[today] || 0,
+      totalAllTimeMs: u.totalAllTimeMs || 0,
+      dailyMs: u.dailyMs || {},
+      stats: u.stats || {},
+      currentTask: u.currentTask || null,
+      isOnline,
+      lastSeen: u.lastSeen,
+      joinedAt: u.joinedAt,
+      projects: (u.projects || []).map(p => ({ id: p.id, title: p.title })),
+      tags: (u.tags || []).map(t => ({ id: t.id, title: t.title, color: t.color })),
+      simpleCounters: u.simpleCounters || [],
+    };
+  });
+
   users.sort((a, b) => b.todayMs - a.todayMs);
   res.json({ users, challenge: db.challenge, today });
+});
+
+// ─── GET /api/user/:username ──────────────────────────────────────────────────
+// Full profile of a single user (for detailed view on website)
+app.get('/api/user/:username', (req, res) => {
+  const u = db.users[req.params.username];
+  if (!u) return res.status(404).json({ error: 'Not found' });
+  const { ip, ...safe } = u; // don't expose IP
+  res.json(safe);
 });
 
 // ─── GET /api/studywar ────────────────────────────────────────────────────────
@@ -135,7 +204,7 @@ app.get('/api/studywar', (req, res) => {
     for (let d = 0; d < daysPassed; d++) {
       const date = new Date(start); date.setDate(date.getDate() + d);
       const dateStr = date.toISOString().split('T')[0];
-      const ms = u.dailyMs[dateStr] || 0;
+      const ms = u.dailyMs?.[dateStr] || 0;
       const hours = ms / 3600000;
       totalChallengeMs += ms;
       if (ms > 0) daysAttempted++;
@@ -150,7 +219,13 @@ app.get('/api/studywar', (req, res) => {
     else if (daysCompleted >= 3) rank = 'bronze';
     let titles = [];
     if (daysCompleted === (challenge.durationDays || 7)) titles.push('iron_discipline');
-    return { username: u.username, totalChallengeMs, totalHours: Math.round(totalHours*10)/10, daysCompleted, daysAttempted, eliminated, rank, titles, dailyBreakdown };
+    return {
+      username: u.username,
+      totalChallengeMs,
+      totalHours: Math.round(totalHours * 10) / 10,
+      daysCompleted, daysAttempted, eliminated, rank, titles, dailyBreakdown,
+      stats: u.stats || {},
+    };
   });
 
   users.sort((a, b) => b.totalChallengeMs - a.totalChallengeMs);
@@ -197,7 +272,26 @@ app.post('/api/admin/challenge', verifyAdmin, (req, res) => {
 });
 
 app.get('/api/admin/users', verifyAdmin, (req, res) => {
+  // Return full data for admin
   res.json({ users: Object.values(db.users), deletedIPs: db.deletedIPs || [] });
+});
+
+// ─── GET /api/stats ───────────────────────────────────────────────────────────
+// Aggregate stats across all users — useful for future dashboard widgets
+app.get('/api/stats', (req, res) => {
+  const today = new Date().toISOString().split('T')[0];
+  const allUsers = Object.values(db.users);
+  const activeToday = allUsers.filter(u => (u.dailyMs?.[today] || 0) > 0);
+  const totalTodayMs = activeToday.reduce((s, u) => s + (u.dailyMs?.[today] || 0), 0);
+  const totalAllTimeMs = allUsers.reduce((s, u) => s + (u.totalAllTimeMs || 0), 0);
+
+  res.json({
+    totalUsers: allUsers.length,
+    activeToday: activeToday.length,
+    totalTodayMs,
+    totalAllTimeMs,
+    topUserToday: activeToday.sort((a, b) => (b.dailyMs?.[today] || 0) - (a.dailyMs?.[today] || 0))[0]?.username || null,
+  });
 });
 
 app.get('*', (req, res) => {
