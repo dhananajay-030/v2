@@ -7,6 +7,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin1234';
 const MONGODB_URI = process.env.MONGODB_URI || '';
+if (!MONGODB_URI) { console.error("❌ MONGODB_URI env var is not set!"); process.exit(1); }
 const DB_NAME = 'studyforge';
 
 app.use(cors());
@@ -211,4 +212,4 @@ app.get('*', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'in
 // ─── START ────────────────────────────────────────────────────────────────────
 connectDB()
   .then(() => app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`)))
-  .catch(e => { console.error('DB connect failed:', e); process.exit(1); });
+  .catch(e => { console.error("DB connect failed:", e.message); console.error("Full error:", JSON.stringify(e, null, 2)); process.exit(1); });
