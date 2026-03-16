@@ -1,0 +1,1418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StudyForge — Leaderboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080b14;
+    --surface: #0d1220;
+    --surface2: #111827;
+    --border: rgba(255,255,255,0.06);
+    --accent: #e8c547;
+    --accent2: #ff6b35;
+    --accent3: #00d4aa;
+    --text: #f0f4ff;
+    --muted: rgba(240,244,255,0.45);
+    --gold: #ffd700;
+    --silver: #c0c0c0;
+    --bronze: #cd7f32;
+    --red: #ff4757;
+    --green: #2ed573;
+    --rank1: linear-gradient(135deg, #ffd700, #ff8c00);
+    --rank2: linear-gradient(135deg, #c0c0c0, #808080);
+    --rank3: linear-gradient(135deg, #cd7f32, #8b4513);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── BACKGROUND GRID ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(232,197,71,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(232,197,71,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -20%;
+    width: 60%;
+    height: 80%;
+    background: radial-gradient(ellipse, rgba(232,197,71,0.04) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    position: relative;
+    z-index: 10;
+    padding: 2rem 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.2rem;
+    letter-spacing: 0.12em;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .logo span {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    display: block;
+    background: var(--muted);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-top: -6px;
+  }
+
+  .header-right {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .live-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 1rem;
+    border: 1px solid rgba(46,213,115,0.3);
+    border-radius: 2px;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    color: var(--green);
+  }
+
+  .live-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  .admin-btn {
+    padding: 0.4rem 1rem;
+    border: 1px solid rgba(232,197,71,0.3);
+    background: transparent;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 2px;
+  }
+
+  .admin-btn:hover {
+    background: rgba(232,197,71,0.1);
+    border-color: var(--accent);
+  }
+
+  /* ── TABS ── */
+  .tabs-container {
+    position: relative;
+    z-index: 10;
+    padding: 2rem 3rem 0;
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tab {
+    padding: 0.8rem 2rem;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-bottom: 2px solid transparent;
+    transition: all 0.25s;
+    position: relative;
+    text-transform: uppercase;
+  }
+
+  .tab.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab:hover:not(.active) {
+    color: rgba(240,244,255,0.7);
+  }
+
+  .tab .tab-icon { margin-right: 0.5rem; }
+
+  /* ── MAIN CONTENT ── */
+  .main {
+    position: relative;
+    z-index: 10;
+    padding: 2rem 3rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  /* ── SECTION HEADER ── */
+  .section-header {
+    margin-bottom: 2rem;
+  }
+
+  .section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3rem;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+  }
+
+  .section-title .highlight { color: var(--accent); }
+
+  .section-subtitle {
+    color: var(--muted);
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+  }
+
+  /* ── TODAY SNAPSHOT ── */
+  .snapshot-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .snapshot-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.2rem 1.5rem;
+    transition: border-color 0.2s;
+  }
+
+  .snapshot-card:hover { border-color: rgba(232,197,71,0.2); }
+
+  .snapshot-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  .snapshot-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.2rem;
+    letter-spacing: 0.05em;
+    color: var(--accent);
+  }
+
+  /* ── RANK MILESTONES ── */
+  .milestones {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .milestone {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  .milestone.active-milestone { border-color: rgba(232,197,71,0.4); color: var(--accent); }
+
+  /* ── LEADERBOARD TABLE ── */
+  .lb-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .lb-table th {
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+    padding: 0.8rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .lb-row {
+    transition: background 0.15s;
+    animation: fadeSlide 0.4s ease both;
+  }
+
+  .lb-row:hover { background: rgba(255,255,255,0.025); }
+
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .lb-row td {
+    padding: 1rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    font-size: 0.85rem;
+    vertical-align: middle;
+  }
+
+  /* Rank badge */
+  .rank-badge {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .rank-1 { background: var(--rank1); color: #000; box-shadow: 0 0 20px rgba(255,215,0,0.3); }
+  .rank-2 { background: var(--rank2); color: #000; }
+  .rank-3 { background: var(--rank3); color: #fff; }
+  .rank-n { background: var(--surface2); color: var(--muted); }
+
+  .username-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+  }
+
+  .avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #000;
+    flex-shrink: 0;
+  }
+
+  .username-text { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 0.9rem; }
+
+  /* Progress bar */
+  .time-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .time-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+    min-width: 80px;
+  }
+
+  .time-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent3), var(--accent));
+    transition: width 1s ease;
+  }
+
+  .time-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.2rem;
+    color: var(--text);
+    min-width: 60px;
+    text-align: right;
+  }
+
+  .rank-time-labels {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .rank-time-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  /* Interval rank pills */
+  .interval-ranks {
+    display: flex;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+  }
+
+  .interval-pill {
+    padding: 0.2rem 0.5rem;
+    border-radius: 2px;
+    font-size: 0.65rem;
+    letter-spacing: 0.05em;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .interval-pill.rank-best { border-color: rgba(232,197,71,0.4); color: var(--accent); background: rgba(232,197,71,0.05); }
+  .interval-pill.rank-2nd { border-color: rgba(192,192,192,0.3); color: #c0c0c0; }
+
+  /* ── STUDY WAR TAB ── */
+  .war-banner {
+    background: linear-gradient(135deg, rgba(255,107,53,0.1), rgba(232,197,71,0.05));
+    border: 1px solid rgba(255,107,53,0.25);
+    border-radius: 4px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .war-banner::before {
+    content: '⚔️';
+    position: absolute;
+    right: 2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 5rem;
+    opacity: 0.08;
+  }
+
+  .war-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.5rem;
+    letter-spacing: 0.12em;
+    color: var(--accent2);
+    margin-bottom: 0.3rem;
+  }
+
+  .war-subtitle {
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+  }
+
+  .war-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+
+  .war-stat {
+    text-align: center;
+  }
+
+  .war-stat-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    color: var(--accent);
+  }
+
+  .war-stat-label {
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  /* Challenge inactive banner */
+  .challenge-inactive {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--muted);
+  }
+
+  .challenge-inactive .big-icon { font-size: 4rem; margin-bottom: 1rem; }
+  .challenge-inactive h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+
+  /* War user cards */
+  .war-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .war-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    animation: fadeSlide 0.4s ease both;
+    transition: border-color 0.2s;
+  }
+
+  .war-card:hover { border-color: rgba(232,197,71,0.2); }
+
+  .war-card.eliminated {
+    opacity: 0.5;
+    border-color: rgba(255,71,87,0.2);
+  }
+
+  .war-card.eliminated::after {
+    content: 'ELIMINATED';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-15deg);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    color: var(--red);
+    opacity: 0.4;
+    letter-spacing: 0.2em;
+    pointer-events: none;
+  }
+
+  .war-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+
+  .war-rank-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3rem;
+    color: rgba(255,255,255,0.06);
+    position: absolute;
+    top: 0.5rem;
+    right: 1rem;
+    line-height: 1;
+  }
+
+  .war-username {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .rank-badge-war {
+    padding: 0.3rem 0.8rem;
+    border-radius: 2px;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+  }
+
+  .rb-gold { background: rgba(255,215,0,0.15); border: 1px solid rgba(255,215,0,0.3); color: var(--gold); }
+  .rb-silver { background: rgba(192,192,192,0.1); border: 1px solid rgba(192,192,192,0.25); color: var(--silver); }
+  .rb-bronze { background: rgba(205,127,50,0.1); border: 1px solid rgba(205,127,50,0.25); color: var(--bronze); }
+  .rb-none { background: rgba(255,255,255,0.03); border: 1px solid var(--border); color: var(--muted); }
+
+  .war-total {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.5rem;
+    color: var(--text);
+    line-height: 1;
+    margin-bottom: 0.2rem;
+  }
+
+  .war-total-label { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.15em; }
+
+  /* Day dots */
+  .day-dots {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .day-dot {
+    width: 28px; height: 28px;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    font-family: 'Bebas Neue', sans-serif;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    title: attr(data-tip);
+    cursor: default;
+    position: relative;
+  }
+
+  .day-dot.done { background: rgba(46,213,115,0.15); border-color: rgba(46,213,115,0.3); color: var(--green); }
+  .day-dot.partial { background: rgba(232,197,71,0.1); border-color: rgba(232,197,71,0.2); color: var(--accent); }
+  .day-dot.missed { background: rgba(255,71,87,0.08); border-color: rgba(255,71,87,0.2); color: var(--red); }
+  .day-dot.future { opacity: 0.3; }
+
+  .titles-row {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-top: 0.8rem;
+  }
+
+  .title-badge {
+    padding: 0.2rem 0.6rem;
+    border-radius: 2px;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    border: 1px solid rgba(232,197,71,0.3);
+    color: var(--accent);
+    background: rgba(232,197,71,0.05);
+  }
+
+  /* ── ADMIN MODAL ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 480px;
+    position: relative;
+  }
+
+  .modal-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    letter-spacing: 0.1em;
+    margin-bottom: 1.5rem;
+    color: var(--accent);
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 1rem; right: 1rem;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 1.2rem;
+    cursor: pointer;
+    font-family: 'Syne', sans-serif;
+  }
+
+  .form-group { margin-bottom: 1rem; }
+
+  .form-label {
+    display: block;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 0.7rem 1rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .form-input:focus { border-color: rgba(232,197,71,0.4); }
+
+  .btn {
+    padding: 0.7rem 1.5rem;
+    border-radius: 2px;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+  }
+
+  .btn-primary:hover { background: #f0cc55; }
+
+  .btn-danger {
+    background: transparent;
+    border: 1px solid rgba(255,71,87,0.4);
+    color: var(--red);
+  }
+
+  .btn-danger:hover { background: rgba(255,71,87,0.1); }
+
+  .btn-sm {
+    padding: 0.3rem 0.8rem;
+    font-size: 0.7rem;
+  }
+
+  .admin-section { margin-bottom: 1.5rem; }
+  .admin-section-title {
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .user-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    font-size: 0.8rem;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.8rem;
+  }
+
+  .toggle {
+    position: relative;
+    width: 44px; height: 22px;
+  }
+
+  .toggle input { opacity: 0; width: 0; height: 0; }
+
+  .toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+
+  .toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 16px; height: 16px;
+    left: 2px; top: 2px;
+    background: var(--muted);
+    border-radius: 50%;
+    transition: 0.3s;
+  }
+
+  .toggle input:checked + .toggle-slider { background: rgba(232,197,71,0.2); border-color: var(--accent); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(22px); background: var(--accent); }
+
+  .error-msg { color: var(--red); font-size: 0.75rem; margin-top: 0.5rem; }
+  .success-msg { color: var(--green); font-size: 0.75rem; margin-top: 0.5rem; }
+
+  /* ── LOADING ── */
+  .loading {
+    text-align: center;
+    padding: 4rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+    letter-spacing: 0.2em;
+  }
+
+  .loading::after {
+    content: '';
+    display: block;
+    width: 30px; height: 30px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 1rem auto 0;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── KING BANNER ── */
+  .king-banner {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: linear-gradient(135deg, rgba(255,215,0,0.08), transparent);
+    border: 1px solid rgba(255,215,0,0.2);
+    border-radius: 4px;
+    padding: 0.8rem 1.2rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.85rem;
+  }
+
+  .king-icon { font-size: 1.5rem; }
+
+  .king-label { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.15em; display: block; }
+  .king-name { font-family: 'Syne', sans-serif; font-weight: 700; color: var(--gold); }
+
+  /* ── CHALLENGE PROGRESS BAR ── */
+  .challenge-progress {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .cp-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    margin-bottom: 0.6rem;
+  }
+
+  .cp-bar {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .cp-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    border-radius: 3px;
+    transition: width 1s ease;
+  }
+
+  /* ── PLUGIN PLACEHOLDER TAB ── */
+  .plugin-cta {
+    text-align: center;
+    padding: 3rem 2rem;
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+    color: var(--muted);
+  }
+
+  .plugin-cta .icon { font-size: 3rem; margin-bottom: 1rem; }
+  .plugin-cta h3 { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; margin-bottom: 0.5rem; color: rgba(240,244,255,0.3); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    .header { padding: 1.2rem 1.5rem; }
+    .tabs-container { padding: 1rem 1.5rem 0; overflow-x: auto; }
+    .main { padding: 1.5rem; }
+    .snapshot-row { grid-template-columns: repeat(2, 1fr); }
+    .war-stats { grid-template-columns: repeat(3, 1fr); }
+    .section-title { font-size: 2rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo">
+    StudyForge
+    <span>PRODUCTIVITY LEADERBOARD v2</span>
+  </div>
+  <div class="header-right">
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      LIVE
+    </div>
+    <button class="admin-btn" onclick="openAdminModal()">⚙ ADMIN</button>
+  </div>
+</header>
+
+<!-- TABS -->
+<div class="tabs-container">
+  <button class="tab active" onclick="switchTab('leaderboard', this)">
+    <span class="tab-icon">🏆</span>LEADERBOARD
+  </button>
+  <button class="tab" onclick="switchTab('studywar', this)">
+    <span class="tab-icon">⚔️</span>STUDY WAR
+  </button>
+  <!-- Plugin slot: future tabs injected here by plugins -->
+  <div id="plugin-tabs"></div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+
+  <!-- ── LEADERBOARD TAB ── -->
+  <div id="tab-leaderboard">
+    <div class="section-header">
+      <div class="section-title">TODAY'S <span class="highlight">GRIND</span></div>
+      <div class="section-subtitle" id="lb-date">Loading…</div>
+    </div>
+
+    <div class="snapshot-row" id="lb-snapshot">
+      <div class="snapshot-card">
+        <div class="snapshot-label">Active Today</div>
+        <div class="snapshot-value" id="snap-active">—</div>
+      </div>
+      <div class="snapshot-card">
+        <div class="snapshot-label">Top Hours</div>
+        <div class="snapshot-value" id="snap-top">—</div>
+      </div>
+      <div class="snapshot-card">
+        <div class="snapshot-label">Total Hours</div>
+        <div class="snapshot-value" id="snap-total">—</div>
+      </div>
+      <div class="snapshot-card">
+        <div class="snapshot-label">Updated</div>
+        <div class="snapshot-value" id="snap-updated" style="font-size:1.2rem;">—</div>
+      </div>
+    </div>
+
+    <!-- Interval milestones -->
+    <div class="milestones" id="lb-milestones">
+      <div class="milestone active-milestone">🌅 2h CHECKPOINT</div>
+      <div class="milestone">☀️ 4h CHECKPOINT</div>
+      <div class="milestone">⚡ 6h CHECKPOINT</div>
+      <div class="milestone">🔥 8h CHECKPOINT</div>
+      <div class="milestone">💪 10h CHECKPOINT</div>
+      <div class="milestone">🌙 12h CHECKPOINT</div>
+      <div class="milestone">⭐ 14h CHECKPOINT</div>
+      <div class="milestone">👑 16h LEGEND</div>
+    </div>
+
+    <div id="lb-loading" class="loading">LOADING LEADERBOARD</div>
+    <table class="lb-table" id="lb-table" style="display:none;">
+      <thead>
+        <tr>
+          <th style="width:60px">RANK</th>
+          <th>SCHOLAR</th>
+          <th>TODAY</th>
+          <th>2HR RANKS</th>
+        </tr>
+      </thead>
+      <tbody id="lb-body"></tbody>
+    </table>
+  </div>
+
+  <!-- ── STUDY WAR TAB ── -->
+  <div id="tab-studywar" style="display:none;">
+    <div id="war-inactive" class="challenge-inactive" style="display:none;">
+      <div class="big-icon">⚔️</div>
+      <h2>NO ACTIVE CHALLENGE</h2>
+      <p>The admin hasn't started a challenge yet. Check back soon.</p>
+    </div>
+    <div id="war-active" style="display:none;">
+      <div class="war-banner">
+        <div class="war-title">STUDY WAR ⚔️</div>
+        <div class="war-subtitle">👑 7-DAY ELITE CHALLENGE — 10+ HOURS DAILY</div>
+        <div class="war-stats">
+          <div class="war-stat">
+            <div class="war-stat-val" id="war-day">—</div>
+            <div class="war-stat-label">Current Day</div>
+          </div>
+          <div class="war-stat">
+            <div class="war-stat-val" id="war-alive">—</div>
+            <div class="war-stat-label">Still Standing</div>
+          </div>
+          <div class="war-stat">
+            <div class="war-stat-val" id="war-gold-count">—</div>
+            <div class="war-stat-label">Gold Warriors</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="challenge-progress">
+        <div class="cp-header">
+          <span id="war-start-label">Start</span>
+          <span id="war-progress-label">0 / 7 days</span>
+          <span id="war-end-label">End</span>
+        </div>
+        <div class="cp-bar"><div class="cp-fill" id="war-progress-fill" style="width:0%"></div></div>
+      </div>
+
+      <div id="war-king-banner" class="king-banner" style="display:none;">
+        <div class="king-icon">👑</div>
+        <div>
+          <span class="king-label">KING OF THE DAY</span>
+          <span class="king-name" id="war-king-name"></span>
+        </div>
+      </div>
+
+      <div id="war-loading" class="loading">LOADING WAR DATA</div>
+      <div class="war-grid" id="war-grid"></div>
+    </div>
+  </div>
+
+  <!-- Plugin content slots injected here -->
+  <div id="plugin-content"></div>
+
+</div>
+
+<!-- ── ADMIN MODAL ── -->
+<div class="modal-overlay" id="admin-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeAdminModal()">✕</button>
+
+    <div id="admin-login-view">
+      <div class="modal-title">ADMIN ACCESS</div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" class="form-input" id="admin-pass-input" placeholder="Enter admin password" onkeydown="if(event.key==='Enter')doAdminLogin()">
+      </div>
+      <button class="btn btn-primary" onclick="doAdminLogin()">UNLOCK</button>
+      <div class="error-msg" id="admin-login-error" style="display:none;"></div>
+    </div>
+
+    <div id="admin-panel-view" style="display:none;">
+      <div class="modal-title">⚙ ADMIN PANEL</div>
+
+      <!-- Challenge settings -->
+      <div class="admin-section">
+        <div class="admin-section-title">Challenge Settings</div>
+        <div class="toggle-row">
+          <span style="font-size:0.8rem;">Challenge Active</span>
+          <label class="toggle">
+            <input type="checkbox" id="challenge-toggle" onchange="updateChallenge()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Start Date</label>
+          <input type="date" class="form-input" id="challenge-start" onchange="updateChallenge()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Duration (days)</label>
+          <input type="number" class="form-input" id="challenge-duration" value="7" min="1" max="30" onchange="updateChallenge()">
+        </div>
+        <div class="success-msg" id="challenge-saved" style="display:none;">✓ Saved</div>
+      </div>
+
+      <!-- User management -->
+      <div class="admin-section">
+        <div class="admin-section-title">User Management</div>
+        <div id="admin-user-list">Loading users…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────────────────────────
+const API = window.location.origin;
+let adminToken = null;
+let lbRefreshTimer = null;
+
+// ─────────────────────────────────────────────────────────────────
+// TABS
+// ─────────────────────────────────────────────────────────────────
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-leaderboard').style.display = name === 'leaderboard' ? '' : 'none';
+  document.getElementById('tab-studywar').style.display = name === 'studywar' ? '' : 'none';
+  if (name === 'studywar') loadStudyWar();
+}
+
+// ─────────────────────────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────────────────────────
+function msToHours(ms) { return ms / 3600000; }
+function fmtHours(ms) {
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h === 0) return m + 'm';
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+function fmtHoursShort(ms) {
+  const h = (ms / 3600000).toFixed(1);
+  return h + 'h';
+}
+function initials(name) { return name.slice(0,2).toUpperCase(); }
+function getAvatarColor(name) {
+  const colors = ['#e8c547','#ff6b35','#00d4aa','#a78bfa','#f472b6','#38bdf8'];
+  let hash = 0;
+  for (let c of name) hash = (hash * 31 + c.charCodeAt(0)) % colors.length;
+  return colors[Math.abs(hash)];
+}
+
+// ─────────────────────────────────────────────────────────────────
+// LEADERBOARD
+// ─────────────────────────────────────────────────────────────────
+async function loadLeaderboard() {
+  try {
+    const res = await fetch(`${API}/api/leaderboard`);
+    const data = await res.json();
+    renderLeaderboard(data);
+  } catch(e) {
+    document.getElementById('lb-loading').textContent = 'Failed to load. Retrying…';
+  }
+}
+
+function renderLeaderboard({ users, today }) {
+  const loading = document.getElementById('lb-loading');
+  const table = document.getElementById('lb-table');
+  const body = document.getElementById('lb-body');
+
+  // Update date
+  document.getElementById('lb-date').textContent = new Date(today).toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  // Snapshot
+  const activeUsers = users.filter(u => u.todayMs > 0);
+  const totalMs = activeUsers.reduce((s,u) => s + u.todayMs, 0);
+  document.getElementById('snap-active').textContent = activeUsers.length;
+  document.getElementById('snap-top').textContent = users[0] ? fmtHoursShort(users[0].todayMs) : '0h';
+  document.getElementById('snap-total').textContent = fmtHoursShort(totalMs);
+  document.getElementById('snap-updated').textContent = new Date().toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
+
+  // Milestones - highlight current leader's tier
+  const topHours = users[0] ? msToHours(users[0].todayMs) : 0;
+  const milestones = document.querySelectorAll('.milestone');
+  const thresholds = [2,4,6,8,10,12,14,16];
+  milestones.forEach((m, i) => {
+    m.classList.toggle('active-milestone', topHours >= thresholds[i]);
+  });
+
+  // Compute 2hr interval ranks
+  const intervals = [2,4,6,8,10,12,14,16];
+  // For simplicity: rank at each interval = rank by that interval's time (same as today since we have cumulative)
+
+  if (!users.length) {
+    loading.textContent = 'No data yet. Open Super Productivity to start tracking!';
+    loading.style.display = '';
+    table.style.display = 'none';
+    return;
+  }
+
+  loading.style.display = 'none';
+  table.style.display = '';
+
+  const maxMs = users[0]?.todayMs || 1;
+
+  body.innerHTML = users.map((u, i) => {
+    const pct = (u.todayMs / maxMs * 100).toFixed(1);
+    const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : 'rank-n';
+    const rankLabel = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i+1;
+    const color = getAvatarColor(u.username);
+    const hours = msToHours(u.todayMs);
+
+    // Interval pills: show what rank they were at 2h intervals
+    // Since we have daily total, we label by tier they've crossed
+    const crossedIntervals = intervals.filter(t => hours >= t);
+    const intervalHTML = crossedIntervals.length > 0
+      ? crossedIntervals.map(t => `<span class="interval-pill rank-best">${t}h ✓</span>`).join('')
+      : '<span class="interval-pill">—</span>';
+
+    return `<tr class="lb-row" style="animation-delay:${i*0.05}s">
+      <td><div class="rank-badge ${rankClass}">${rankLabel}</div></td>
+      <td>
+        <div class="username-cell">
+          <div class="avatar" style="background:${color}">${initials(u.username)}</div>
+          <div class="username-text">${escapeHtml(u.username)}</div>
+        </div>
+      </td>
+      <td>
+        <div class="time-bar-wrap">
+          <div class="time-bar"><div class="time-bar-fill" style="width:${pct}%"></div></div>
+          <div class="time-value">${fmtHours(u.todayMs)}</div>
+        </div>
+      </td>
+      <td><div class="interval-ranks">${intervalHTML}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────────────
+// STUDY WAR
+// ─────────────────────────────────────────────────────────────────
+async function loadStudyWar() {
+  try {
+    const res = await fetch(`${API}/api/studywar`);
+    const data = await res.json();
+    renderStudyWar(data);
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+function renderStudyWar(data) {
+  const inactive = document.getElementById('war-inactive');
+  const active = document.getElementById('war-active');
+  const loading = document.getElementById('war-loading');
+  const grid = document.getElementById('war-grid');
+
+  if (!data.active) {
+    inactive.style.display = '';
+    active.style.display = 'none';
+    return;
+  }
+
+  inactive.style.display = 'none';
+  active.style.display = '';
+
+  // Stats
+  const alive = data.users.filter(u => !u.eliminated).length;
+  const goldCount = data.users.filter(u => u.rank === 'gold').length;
+  document.getElementById('war-day').textContent = `DAY ${data.daysPassed}`;
+  document.getElementById('war-alive').textContent = alive;
+  document.getElementById('war-gold-count').textContent = goldCount;
+
+  // Progress
+  document.getElementById('war-start-label').textContent = data.startDate || '';
+  document.getElementById('war-end-label').textContent = data.endDate || '';
+  document.getElementById('war-progress-label').textContent = `${data.daysPassed} / ${data.challenge.durationDays || 7} days`;
+  document.getElementById('war-progress-fill').style.width = `${(data.daysPassed / (data.challenge.durationDays||7)) * 100}%`;
+
+  // King of day
+  if (data.kingOfDay) {
+    document.getElementById('war-king-banner').style.display = '';
+    document.getElementById('war-king-name').textContent = data.kingOfDay;
+  }
+
+  loading.style.display = 'none';
+
+  const durationDays = data.challenge.durationDays || 7;
+  const startDate = new Date(data.startDate);
+
+  grid.innerHTML = data.users.map((u, i) => {
+    const rankLabel = getRankLabel(u.rank);
+    const rankClass = u.rank ? `rb-${u.rank}` : 'rb-none';
+
+    // Day dots
+    const dots = Array.from({ length: durationDays }, (_, d) => {
+      const date = new Date(startDate);
+      date.setDate(date.getDate() + d);
+      const dateStr = date.toISOString().split('T')[0];
+      const dayData = u.dailyBreakdown?.[d];
+      if (!dayData) return `<div class="day-dot future">${d+1}</div>`;
+      if (dayData.completed) return `<div class="day-dot done" title="${dayData.hours}h">${d+1}</div>`;
+      if (dayData.ms > 0) return `<div class="day-dot partial" title="${dayData.hours}h">${d+1}</div>`;
+      if (d < data.daysPassed) return `<div class="day-dot missed" title="Missed">${d+1}</div>`;
+      return `<div class="day-dot future">${d+1}</div>`;
+    }).join('');
+
+    const titlesHTML = u.titles?.map(t => `<div class="title-badge">${getTitleLabel(t)}</div>`).join('') || '';
+    const color = getAvatarColor(u.username);
+
+    return `<div class="war-card ${u.eliminated ? 'eliminated' : ''}">
+      <div class="war-rank-num">${i+1}</div>
+      <div class="war-card-header">
+        <div class="username-cell">
+          <div class="avatar" style="background:${color}">${initials(u.username)}</div>
+          <div class="war-username">${escapeHtml(u.username)}</div>
+        </div>
+        <div class="rank-badge-war ${rankClass}">${rankLabel}</div>
+      </div>
+      <div class="war-total">${u.totalHours}h</div>
+      <div class="war-total-label">TOTAL CHALLENGE HOURS · ${u.daysCompleted}/${durationDays} DAYS</div>
+      <div class="day-dots">${dots}</div>
+      ${titlesHTML ? `<div class="titles-row">${titlesHTML}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function getRankLabel(rank) {
+  if (rank === 'gold') return '🥇 GOLD WARRIOR';
+  if (rank === 'silver') return '🥈 SILVER WARRIOR';
+  if (rank === 'bronze') return '🥉 BRONZE WARRIOR';
+  return '— IN PROGRESS';
+}
+
+function getTitleLabel(t) {
+  if (t === 'iron_discipline') return '⚡ Iron Discipline';
+  if (t === 'comeback_warrior') return '🚀 Comeback Warrior';
+  return t;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// ADMIN MODAL
+// ─────────────────────────────────────────────────────────────────
+function openAdminModal() {
+  document.getElementById('admin-modal').classList.add('open');
+  if (adminToken) showAdminPanel();
+}
+
+function closeAdminModal() {
+  document.getElementById('admin-modal').classList.remove('open');
+}
+
+async function doAdminLogin() {
+  const pass = document.getElementById('admin-pass-input').value;
+  const errEl = document.getElementById('admin-login-error');
+  errEl.style.display = 'none';
+
+  try {
+    const res = await fetch(`${API}/api/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pass })
+    });
+    const data = await res.json();
+    if (data.success) {
+      adminToken = data.token;
+      showAdminPanel();
+    } else {
+      errEl.textContent = 'Wrong password';
+      errEl.style.display = '';
+    }
+  } catch {
+    errEl.textContent = 'Server error';
+    errEl.style.display = '';
+  }
+}
+
+async function showAdminPanel() {
+  document.getElementById('admin-login-view').style.display = 'none';
+  document.getElementById('admin-panel-view').style.display = '';
+
+  // Load challenge settings
+  try {
+    const res = await fetch(`${API}/api/leaderboard`);
+    const data = await res.json();
+    if (data.challenge) {
+      document.getElementById('challenge-toggle').checked = data.challenge.active;
+      if (data.challenge.startDate) document.getElementById('challenge-start').value = data.challenge.startDate;
+      if (data.challenge.durationDays) document.getElementById('challenge-duration').value = data.challenge.durationDays;
+    }
+  } catch {}
+
+  // Load users
+  try {
+    const res = await fetch(`${API}/api/admin/users`, { headers: { 'x-admin-token': adminToken } });
+    const data = await res.json();
+    renderAdminUsers(data.users);
+  } catch {}
+}
+
+function renderAdminUsers(users) {
+  const el = document.getElementById('admin-user-list');
+  if (!users.length) { el.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;">No users yet.</div>'; return; }
+  el.innerHTML = users.map(u => `
+    <div class="user-list-item">
+      <div>
+        <div style="font-family:'Syne',sans-serif;font-weight:600;font-size:0.85rem;">${escapeHtml(u.username)}</div>
+        <div style="font-size:0.65rem;color:var(--muted);">${u.ip || 'unknown IP'} · ${fmtHours(u.totalMs)} total</div>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="deleteUser('${escapeHtml(u.username)}')">REMOVE</button>
+    </div>
+  `).join('');
+}
+
+async function deleteUser(username) {
+  if (!confirm(`Remove ${username} from the leaderboard?`)) return;
+  await fetch(`${API}/api/admin/user/${encodeURIComponent(username)}`, {
+    method: 'DELETE',
+    headers: { 'x-admin-token': adminToken }
+  });
+  showAdminPanel();
+  loadLeaderboard();
+}
+
+let challengeSaveTimeout = null;
+async function updateChallenge() {
+  clearTimeout(challengeSaveTimeout);
+  challengeSaveTimeout = setTimeout(async () => {
+    const active = document.getElementById('challenge-toggle').checked;
+    const startDate = document.getElementById('challenge-start').value;
+    const durationDays = parseInt(document.getElementById('challenge-duration').value) || 7;
+
+    await fetch(`${API}/api/admin/challenge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+      body: JSON.stringify({ active, startDate, durationDays })
+    });
+
+    const saved = document.getElementById('challenge-saved');
+    saved.style.display = '';
+    setTimeout(() => saved.style.display = 'none', 2000);
+  }, 600);
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─────────────────────────────────────────────────────────────────
+// PLUGIN API (for future tabs)
+// ─────────────────────────────────────────────────────────────────
+window.StudyForgePlugins = {
+  registerTab(id, label, icon, renderFn) {
+    const tabsContainer = document.getElementById('plugin-tabs');
+    const btn = document.createElement('button');
+    btn.className = 'tab';
+    btn.innerHTML = `<span class="tab-icon">${icon}</span>${label}`;
+    btn.onclick = () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-leaderboard').style.display = 'none';
+      document.getElementById('tab-studywar').style.display = 'none';
+      const pc = document.getElementById('plugin-content');
+      pc.innerHTML = '';
+      renderFn(pc);
+    };
+    tabsContainer.appendChild(btn);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────
+// INIT + AUTO REFRESH
+// ─────────────────────────────────────────────────────────────────
+loadLeaderboard();
+setInterval(loadLeaderboard, 30000); // refresh every 30s
+</script>
+</body>
+</html>

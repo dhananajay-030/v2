@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: productivity-leaderboard-v2
+    env: node
+    buildCommand: npm install
+    startCommand: node src/server.js
+    envVars:
+      - key: ADMIN_PASSWORD
+        generateValue: false
+        value: admin1234
+    disk:
+      name: data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
