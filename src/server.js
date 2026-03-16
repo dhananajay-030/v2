@@ -12,10 +12,13 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // ─── POSTGRES ─────────────────────────────────────────────────────────────────
+const DB_URL = process.env.DATABASE_URL || '';
+console.log('DB URL host:', DB_URL.split('@')[1]?.split('/')[0] || 'NOT SET');
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: DB_URL,
   family: 4,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: false },
+  connectionTimeoutMillis: 10000,
 });
 
 let ready = false;
