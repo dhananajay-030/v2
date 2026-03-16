@@ -199,6 +199,64 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
 .emsg { color:var(--red); font-size:0.75rem; margin-top:0.5rem; display:none; }
 .smsg { color:var(--green); font-size:0.75rem; margin-top:0.5rem; display:none; }
 
+
+/* ── CALENDAR INSIGHT PANEL ───────────────────────────────────────────────── */
+.lb-row { cursor:pointer; }
+.insight-row td { padding:0; border-bottom:1px solid var(--border); }
+.insight-panel {
+  overflow:hidden;
+  max-height:0;
+  transition:max-height 0.45s cubic-bezier(0.22,1,0.36,1), opacity 0.3s ease;
+  opacity:0;
+  background:linear-gradient(135deg,rgba(13,18,32,0.98),rgba(8,11,20,0.98));
+  border-top:1px solid rgba(232,197,71,0.1);
+}
+.insight-panel.open { max-height:500px; opacity:1; }
+.insight-inner { padding:1.5rem 1.5rem 1.5rem 4rem; }
+
+/* month nav */
+.cal-header { display:flex; align-items:center; gap:1rem; margin-bottom:1.2rem; }
+.cal-title { font-family:'Bebas Neue',sans-serif; font-size:1.4rem; letter-spacing:0.1em; color:var(--accent); flex:1; }
+.cal-nav { background:none; border:1px solid var(--border); color:var(--muted); width:28px; height:28px; border-radius:2px; cursor:pointer; font-size:0.9rem; display:flex; align-items:center; justify-content:center; transition:all 0.2s; }
+.cal-nav:hover { border-color:var(--accent); color:var(--accent); }
+.cal-stats { display:flex; gap:2rem; margin-bottom:1.2rem; flex-wrap:wrap; }
+.cal-stat { }
+.cal-stat-val { font-family:'Bebas Neue',sans-serif; font-size:1.6rem; color:var(--text); }
+.cal-stat-lbl { font-size:0.6rem; letter-spacing:0.15em; color:var(--muted); text-transform:uppercase; }
+
+/* calendar grid */
+.cal-grid {
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:4px;
+}
+.cal-day-label {
+  font-size:0.6rem;
+  color:var(--muted);
+  text-align:center;
+  letter-spacing:0.05em;
+  padding-bottom:4px;
+  font-family:'Syne',sans-serif;
+}
+.cal-cell {
+  border-radius:3px;
+  padding:5px 4px 4px;
+  text-align:center;
+  position:relative;
+  min-height:44px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  transition:transform 0.15s, box-shadow 0.15s;
+  border:1px solid transparent;
+}
+.cal-cell:hover { transform:scale(1.08); box-shadow:0 4px 16px rgba(0,0,0,0.4); border-color:rgba(232,197,71,0.3); z-index:2; }
+.cal-cell.empty { background:transparent; }
+.cal-cell.today-cell { border-color:rgba(232,197,71,0.5) !important; }
+.cal-date { font-size:0.72rem; font-family:'Syne',sans-serif; font-weight:600; line-height:1; }
+.cal-hrs { font-size:0.58rem; font-family:'JetBrains Mono',monospace; margin-top:3px; line-height:1; }
+
 @media(max-width:768px){
   .header{padding:1.2rem 1.5rem;}
   .main{padding:1.5rem;}
@@ -448,7 +506,11 @@ function renderLB({users, today}){
   }
   loading.style.display='none'; table.style.display=''; empty.style.display='none';
 
+  // Store users globally for calendar access
+  window._lbUsers = users;
+
   const maxMs = users[0].todayMs || 1;
+  const now = new Date();
   document.getElementById('lb-body').innerHTML = users.map((u,i)=>{
     const pct = (u.todayMs/maxMs*100).toFixed(1);
     const rc = i===0?'r1':i===1?'r2':i===2?'r3':'rn';
@@ -459,7 +521,8 @@ function renderLB({users, today}){
     const pills = hits.length
       ? hits.map(t=>`<span class="ipill hit">${t}h ✓</span>`).join('')
       : '<span class="ipill">—</span>';
-    return `<tr class="lb-row" style="animation-delay:${i*0.05}s">
+    const uid = 'u'+i;
+    return `<tr class="lb-row" style="animation-delay:${i*0.05}s" onclick="toggleInsight('${uid}','${esc(u.username)}')">
       <td><div class="rank-badge ${rc}">${rl}</div></td>
       <td><div class="user-cell">
         <div class="avatar" style="background:${color}">${initials(u.username)}</div>
@@ -470,8 +533,118 @@ function renderLB({users, today}){
         <div class="time-val">${fmtH(u.todayMs)}</div>
       </div></td>
       <td><div class="intervals">${pills}</div></td>
+    </tr>
+    <tr class="insight-row" id="ir-${uid}">
+      <td colspan="4">
+        <div class="insight-panel" id="ip-${uid}">
+          <div class="insight-inner" id="ii-${uid}"></div>
+        </div>
+      </td>
     </tr>`;
   }).join('');
+}
+
+// ── INSIGHT TOGGLE ─────────────────────────────────────────────────────────
+const _insightState = {}; // uid → { open, month, year }
+
+function toggleInsight(uid, username){
+  const panel = document.getElementById('ip-'+uid);
+  const state = _insightState[uid];
+  if(!state || !state.open){
+    const now = new Date();
+    _insightState[uid] = { open:true, month:now.getMonth(), year:now.getFullYear(), username };
+    panel.classList.add('open');
+    renderCalendar(uid);
+  } else {
+    state.open = false;
+    panel.classList.remove('open');
+  }
+}
+
+function changeMonth(uid, delta){
+  const s = _insightState[uid];
+  if(!s) return;
+  s.month += delta;
+  if(s.month < 0){ s.month=11; s.year--; }
+  if(s.month > 11){ s.month=0; s.year++; }
+  renderCalendar(uid);
+}
+
+function renderCalendar(uid){
+  const s = _insightState[uid];
+  if(!s) return;
+  const u = (window._lbUsers||[]).find(u=>u.username===s.username);
+  if(!u) return;
+
+  const dailyMs = u.dailyMs || {};
+  const year = s.year, month = s.month;
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const today = new Date().toISOString().split('T')[0];
+
+  // Days in month
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+
+  // Month stats
+  let monthTotalMs = 0, activeDays = 0, bestMs = 0;
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const ms = dailyMs[dateStr] || 0;
+    monthTotalMs += ms;
+    if(ms>0) activeDays++;
+    if(ms>bestMs) bestMs=ms;
+  }
+
+  // Color scale — theme gold, gets darker/more intense with hours
+  // 0h = surface, 1h+ = light gold tint, 4h+ = medium, 8h+ = strong, 12h+ = max
+  function dayColor(ms){
+    if(!ms) return 'background:rgba(17,24,39,0.8);';
+    const h = ms/3600000;
+    if(h < 1)  return 'background:rgba(232,197,71,0.08);';
+    if(h < 3)  return 'background:rgba(232,197,71,0.18);';
+    if(h < 5)  return 'background:rgba(232,197,71,0.30);';
+    if(h < 8)  return 'background:rgba(232,197,71,0.45);';
+    if(h < 10) return 'background:rgba(232,197,71,0.60);';
+    if(h < 12) return 'background:rgba(255,160,50,0.75);';
+    return 'background:rgba(255,107,53,0.85);';
+  }
+  function dayTextColor(ms){
+    if(!ms) return 'color:rgba(240,244,255,0.25);';
+    const h = ms/3600000;
+    if(h < 5) return 'color:rgba(240,244,255,0.7);';
+    return 'color:#000;';
+  }
+
+  // Build grid
+  const dayLabels = ['Su','Mo','Tu','We','Th','Fr','Sa'].map(d=>`<div class="cal-day-label">${d}</div>`).join('');
+  let cells = '';
+  // Empty cells before first day
+  for(let i=0;i<firstDay;i++) cells+=`<div class="cal-cell empty"></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const ms = dailyMs[dateStr]||0;
+    const h = ms>0 ? (ms/3600000).toFixed(1) : '';
+    const isToday = dateStr===today ? 'today-cell' : '';
+    cells += `<div class="cal-cell ${isToday}" style="${dayColor(ms)}" title="${dateStr}${ms?' · '+fmtH(ms):''}">
+      <span class="cal-date" style="${dayTextColor(ms)}">${d}</span>
+      ${h?`<span class="cal-hrs" style="${dayTextColor(ms)}">${h}h</span>`:''}
+    </div>`;
+  }
+
+  document.getElementById('ii-'+uid).innerHTML = `
+    <div class="cal-header">
+      <button class="cal-nav" onclick="event.stopPropagation();changeMonth('${uid}',-1)">‹</button>
+      <div class="cal-title">${monthNames[month]} ${year}</div>
+      <button class="cal-nav" onclick="event.stopPropagation();changeMonth('${uid}',1)">›</button>
+    </div>
+    <div class="cal-stats">
+      <div class="cal-stat"><div class="cal-stat-val">${fmtH(monthTotalMs)}</div><div class="cal-stat-lbl">Month Total</div></div>
+      <div class="cal-stat"><div class="cal-stat-val">${activeDays}</div><div class="cal-stat-lbl">Active Days</div></div>
+      <div class="cal-stat"><div class="cal-stat-val">${fmtH(bestMs)}</div><div class="cal-stat-lbl">Best Day</div></div>
+      <div class="cal-stat"><div class="cal-stat-val">${activeDays?fmtH(Math.round(monthTotalMs/activeDays)):'-'}</div><div class="cal-stat-lbl">Daily Avg</div></div>
+    </div>
+    <div class="cal-grid">${dayLabels}${cells}</div>
+  `;
 }
 
 // ── STUDY WAR ──────────────────────────────────────────────────────────────
