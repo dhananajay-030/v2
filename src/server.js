@@ -115,15 +115,20 @@ app.get('/api/leaderboard', async (req, res) => {
   const cfg   = await pool.query('SELECT * FROM challenge WHERE id=$1', ['config']);
   const all   = await pool.query('SELECT username, daily_ms, last_seen, joined_at FROM users');
 
+  const now = Date.now();
   const list = all.rows
-    .map(u => ({
-      username: u.username,
-      todayMs:  u.daily_ms?.[today] || 0,
-      dailyMs:  u.daily_ms || {},
-      lastSeen: u.last_seen,
-      joinedAt: u.joined_at,
-    }))
-    .filter(u => u.todayMs > 0)
+    .map(u => {
+      const lastSeen = u.last_seen ? new Date(u.last_seen).getTime() : 0;
+      const isOnline = (now - lastSeen) < 3 * 60 * 1000; // online if seen < 3min ago
+      return {
+        username: u.username,
+        todayMs:  u.daily_ms?.[today] || 0,
+        dailyMs:  u.daily_ms || {},
+        lastSeen: u.last_seen,
+        joinedAt: u.joined_at,
+        isOnline,
+      };
+    })
     .sort((a, b) => b.todayMs - a.todayMs);
 
   res.json({ users: list, today, challenge: cfg.rows[0] || {} });

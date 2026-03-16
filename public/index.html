@@ -200,6 +200,17 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
 .smsg { color:var(--green); font-size:0.75rem; margin-top:0.5rem; display:none; }
 
 
+/* ── ONLINE DOT ── */
+.online-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  position: absolute; bottom: 0; right: 0;
+  border: 2px solid var(--surface);
+  flex-shrink: 0;
+}
+.online-dot.online  { background: var(--green); box-shadow: 0 0 6px rgba(46,213,115,0.7); animation: pulse 2s infinite; }
+.online-dot.offline { background: var(--red);   box-shadow: 0 0 4px rgba(255,71,87,0.4); }
+.avatar-wrap { position: relative; flex-shrink: 0; }
+
 /* ── CALENDAR INSIGHT PANEL ───────────────────────────────────────────────── */
 .lb-row { cursor:pointer; }
 .insight-row td { padding:0; border-bottom:1px solid var(--border); }
@@ -485,7 +496,7 @@ function renderLB({users, today}){
   document.getElementById('lb-date').textContent =
     new Date(today+'T12:00:00').toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 
-  document.getElementById('snap-active').textContent = users.length;
+  document.getElementById('snap-active').textContent = users.filter(u=>u.todayMs>0).length;
   document.getElementById('snap-top').textContent = users[0] ? fmtHs(users[0].todayMs) : '0h';
 
   // Milestones — highlight based on top user
@@ -509,28 +520,42 @@ function renderLB({users, today}){
   // Store users globally for calendar access
   window._lbUsers = users;
 
-  const maxMs = users[0].todayMs || 1;
-  const now = new Date();
-  document.getElementById('lb-body').innerHTML = users.map((u,i)=>{
-    const pct = (u.todayMs/maxMs*100).toFixed(1);
-    const rc = i===0?'r1':i===1?'r2':i===2?'r3':'rn';
-    const rl = i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1;
+  // Deduplicate by username (just in case)
+  const seen = new Set();
+  const uniqueUsers = users.filter(u => { if(seen.has(u.username)) return false; seen.add(u.username); return true; });
+
+  // Split: active today first, then inactive (0 hours today), sorted by todayMs
+  const activeToday   = uniqueUsers.filter(u => u.todayMs > 0);
+  const inactiveToday = uniqueUsers.filter(u => u.todayMs === 0);
+  const sorted = [...activeToday, ...inactiveToday];
+
+  const maxMs = activeToday[0]?.todayMs || 1;
+  document.getElementById('lb-body').innerHTML = sorted.map((u,i)=>{
+    const isActive = u.todayMs > 0;
+    const rankIdx  = activeToday.indexOf(u); // rank only among active
+    const rc = rankIdx===0?'r1':rankIdx===1?'r2':rankIdx===2?'r3':'rn';
+    const rl = !isActive ? '—' : rankIdx===0?'🥇':rankIdx===1?'🥈':rankIdx===2?'🥉':rankIdx+1;
     const color = avatarColor(u.username);
     const h = msToH(u.todayMs);
     const hits = [2,4,6,8,10,12,14,16].filter(t=>h>=t);
     const pills = hits.length
       ? hits.map(t=>`<span class="ipill hit">${t}h ✓</span>`).join('')
-      : '<span class="ipill">—</span>';
+      : '<span class="ipill" style="color:var(--muted)">Not studied today</span>';
     const uid = 'u'+i;
-    return `<tr class="lb-row" style="animation-delay:${i*0.05}s" onclick="toggleInsight('${uid}','${esc(u.username)}')">
+    const dotClass = u.isOnline ? 'online' : 'offline';
+    const rowStyle = !isActive ? 'opacity:0.5;' : '';
+    return `<tr class="lb-row" style="animation-delay:${i*0.05}s;${rowStyle}" onclick="toggleInsight('${uid}','${esc(u.username)}')">
       <td><div class="rank-badge ${rc}">${rl}</div></td>
       <td><div class="user-cell">
-        <div class="avatar" style="background:${color}">${initials(u.username)}</div>
+        <div class="avatar-wrap">
+          <div class="avatar" style="background:${color}">${initials(u.username)}</div>
+          <div class="online-dot ${dotClass}"></div>
+        </div>
         <div class="uname">${esc(u.username)}</div>
       </div></td>
       <td><div class="bar-wrap">
-        <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
-        <div class="time-val">${fmtH(u.todayMs)}</div>
+        <div class="bar"><div class="bar-fill" style="width:${isActive?(u.todayMs/maxMs*100).toFixed(1):0}%"></div></div>
+        <div class="time-val">${isActive?fmtH(u.todayMs):'—'}</div>
       </div></td>
       <td><div class="intervals">${pills}</div></td>
     </tr>
