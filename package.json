@@ -1,20 +1,13 @@
 {
-  "name": "productivity-leaderboard-v2",
+  "name": "studyforge-leaderboard",
   "version": "2.0.0",
-  "description": "Study Leaderboard & Study War Challenge Server",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "start": "node src/server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.18.2"
   },
-  "devDependencies": {
-    "nodemon": "^3.0.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  }
+  "engines": { "node": ">=18.0.0" }
 }
