@@ -18,7 +18,7 @@ let db, users, challenge, deletedIPs;
 let ready = false;
 
 async function connectDB() {
-  const client = new MongoClient(MONGODB_URI);
+  const client = new MongoClient(MONGODB_URI, { tls: true, tlsAllowInvalidCertificates: false, serverSelectionTimeoutMS: 10000 });
   await client.connect();
   db = client.db(DB_NAME);
   users      = db.collection('users');
