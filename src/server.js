@@ -1,39 +1,46 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { MongoClient } = require('mongodb');
+const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin1234';
-const MONGODB_URI = process.env.MONGODB_URI || '';
-if (!MONGODB_URI) { console.error("❌ MONGODB_URI env var is not set!"); process.exit(1); }
-const DB_NAME = 'studyforge';
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-// ─── MONGODB ──────────────────────────────────────────────────────────────────
-let db, users, challenge, deletedIPs;
+// ─── POSTGRES ─────────────────────────────────────────────────────────────────
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
 let ready = false;
 
-async function connectDB() {
-  const client = new MongoClient(MONGODB_URI, { tls: true, tlsAllowInvalidCertificates: false, serverSelectionTimeoutMS: 10000 });
-  await client.connect();
-  db = client.db(DB_NAME);
-  users      = db.collection('users');
-  challenge  = db.collection('challenge');
-  deletedIPs = db.collection('deletedIPs');
-
-  // Ensure challenge doc exists
-  const existing = await challenge.findOne({ _id: 'config' });
-  if (!existing) {
-    await challenge.insertOne({ _id: 'config', active: false, startDate: null, durationDays: 7 });
-  }
-
+async function initDB() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      username TEXT PRIMARY KEY,
+      ip TEXT,
+      daily_ms JSONB DEFAULT '{}',
+      joined_at TIMESTAMPTZ DEFAULT NOW(),
+      last_seen TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS challenge (
+      id TEXT PRIMARY KEY DEFAULT 'config',
+      active BOOLEAN DEFAULT FALSE,
+      start_date TEXT,
+      duration_days INT DEFAULT 7
+    );
+    CREATE TABLE IF NOT EXISTS deleted_ips (
+      ip TEXT PRIMARY KEY
+    );
+    INSERT INTO challenge (id) VALUES ('config') ON CONFLICT DO NOTHING;
+  `);
   ready = true;
-  console.log('✅ MongoDB connected');
+  console.log('✅ Postgres ready');
 }
 
 app.use((req, res, next) => {
@@ -74,26 +81,26 @@ app.post('/api/submit', async (req, res) => {
   const name  = username.trim();
 
   // Check banned IP
-  const banned = await deletedIPs.findOne({ ip });
-  if (banned && !allowRejoin)
+  const banned = await pool.query('SELECT ip FROM deleted_ips WHERE ip=$1', [ip]);
+  if (banned.rows.length && !allowRejoin)
     return res.status(403).json({ error: 'removed' });
 
-  if (allowRejoin) await deletedIPs.deleteOne({ ip });
+  if (allowRejoin) await pool.query('DELETE FROM deleted_ips WHERE ip=$1', [ip]);
 
   // Block same IP different username
-  const conflict = await users.findOne({ ip, username: { $ne: name } });
-  if (conflict)
-    return res.status(409).json({ error: 'ip_conflict', existing: conflict.username });
+  const conflict = await pool.query('SELECT username FROM users WHERE ip=$1 AND username!=$2', [ip, name]);
+  if (conflict.rows.length)
+    return res.status(409).json({ error: 'ip_conflict', existing: conflict.rows[0].username });
 
-  // Upsert user — update today's ms and lastSeen
-  await users.updateOne(
-    { username: name },
-    {
-      $set:         { ip, lastSeen: new Date().toISOString(), [`dailyMs.${today}`]: timeSpentMs },
-      $setOnInsert: { username: name, joinedAt: new Date().toISOString() },
-    },
-    { upsert: true }
-  );
+  // Upsert user
+  await pool.query(`
+    INSERT INTO users (username, ip, daily_ms, last_seen)
+    VALUES ($1, $2, $3, NOW())
+    ON CONFLICT (username) DO UPDATE
+      SET ip=$2,
+          daily_ms = users.daily_ms || $3,
+          last_seen = NOW()
+  `, [name, ip, JSON.stringify({ [today]: timeSpentMs })]);
 
   res.json({ success: true });
 });
@@ -101,48 +108,50 @@ app.post('/api/submit', async (req, res) => {
 // ─── GET /api/leaderboard ─────────────────────────────────────────────────────
 app.get('/api/leaderboard', async (req, res) => {
   const today = getTodayIST();
-  const cfg   = await challenge.findOne({ _id: 'config' });
+  const cfg   = await pool.query('SELECT * FROM challenge WHERE id=$1', ['config']);
+  const all   = await pool.query('SELECT username, daily_ms, last_seen, joined_at FROM users');
 
-  const all = await users.find({}).toArray();
-  const list = all
+  const list = all.rows
     .map(u => ({
-      username:  u.username,
-      todayMs:   u.dailyMs?.[today] || 0,
-      dailyMs:   u.dailyMs || {},
-      lastSeen:  u.lastSeen,
-      joinedAt:  u.joinedAt,
+      username: u.username,
+      todayMs:  u.daily_ms?.[today] || 0,
+      dailyMs:  u.daily_ms || {},
+      lastSeen: u.last_seen,
+      joinedAt: u.joined_at,
     }))
     .filter(u => u.todayMs > 0)
     .sort((a, b) => b.todayMs - a.todayMs);
 
-  res.json({ users: list, today, challenge: cfg || {} });
+  res.json({ users: list, today, challenge: cfg.rows[0] || {} });
 });
 
 // ─── GET /api/studywar ────────────────────────────────────────────────────────
 app.get('/api/studywar', async (req, res) => {
-  const cfg = await challenge.findOne({ _id: 'config' });
-  if (!cfg?.active || !cfg.startDate)
+  const cfgRes = await pool.query('SELECT * FROM challenge WHERE id=$1', ['config']);
+  const cfg    = cfgRes.rows[0];
+
+  if (!cfg?.active || !cfg.start_date)
     return res.json({ active: false, users: [], challenge: cfg || {} });
 
-  const start      = new Date(cfg.startDate);
-  const dur        = cfg.durationDays || 7;
+  const start      = new Date(cfg.start_date);
+  const dur        = cfg.duration_days || 7;
   const today      = new Date();
   const daysPassed = Math.min(Math.floor((today - start) / 86400000) + 1, dur);
   const endDate    = new Date(start);
   endDate.setDate(endDate.getDate() + dur);
 
-  const all = await users.find({}).toArray();
+  const all = await pool.query('SELECT username, daily_ms FROM users');
 
-  const list = all.map(u => {
+  const list = all.rows.map(u => {
     let totalMs = 0, daysCompleted = 0, daysAttempted = 0, dailyBreakdown = [];
     for (let d = 0; d < daysPassed; d++) {
       const date    = new Date(start);
       date.setDate(date.getDate() + d);
       const dateStr = date.toISOString().split('T')[0];
-      const ms      = u.dailyMs?.[dateStr] || 0;
+      const ms      = u.daily_ms?.[dateStr] || 0;
       const hours   = ms / 3600000;
       totalMs += ms;
-      if (ms > 0)     daysAttempted++;
+      if (ms > 0)      daysAttempted++;
       if (hours >= 10) daysCompleted++;
       dailyBreakdown.push({ date: dateStr, ms, hours: Math.round(hours * 10) / 10, completed: hours >= 10 });
     }
@@ -164,7 +173,12 @@ app.get('/api/studywar', async (req, res) => {
     if (day && day.ms > kingMs) { kingMs = day.ms; kingOfDay = u.username; }
   });
 
-  res.json({ active: true, users: list, challenge: cfg, daysPassed, startDate: cfg.startDate, endDate: endDate.toISOString().split('T')[0], kingOfDay });
+  res.json({
+    active: true, users: list, challenge: cfg, daysPassed,
+    startDate: cfg.start_date,
+    endDate: endDate.toISOString().split('T')[0],
+    kingOfDay
+  });
 });
 
 // ─── ADMIN ────────────────────────────────────────────────────────────────────
@@ -175,41 +189,38 @@ app.post('/api/admin/login', (req, res) => {
 
 app.get('/api/admin/users', verifyAdmin, async (req, res) => {
   const today = getTodayIST();
-  const all   = await users.find({}).toArray();
+  const all   = await pool.query('SELECT username, ip, daily_ms, joined_at FROM users');
   res.json({
-    users: all.map(u => ({
+    users: all.rows.map(u => ({
       username: u.username,
       ip:       u.ip,
-      todayMs:  u.dailyMs?.[today] || 0,
-      joinedAt: u.joinedAt,
+      todayMs:  u.daily_ms?.[today] || 0,
+      joinedAt: u.joined_at,
     }))
   });
 });
 
 app.delete('/api/admin/user/:username', verifyAdmin, async (req, res) => {
-  const u = await users.findOne({ username: req.params.username });
-  if (!u) return res.status(404).json({ error: 'Not found' });
-  if (u.ip && u.ip !== 'unknown') {
-    await deletedIPs.updateOne({ ip: u.ip }, { $set: { ip: u.ip } }, { upsert: true });
-  }
-  await users.deleteOne({ username: req.params.username });
+  const u = await pool.query('SELECT ip FROM users WHERE username=$1', [req.params.username]);
+  if (!u.rows.length) return res.status(404).json({ error: 'Not found' });
+  const ip = u.rows[0].ip;
+  if (ip && ip !== 'unknown')
+    await pool.query('INSERT INTO deleted_ips (ip) VALUES ($1) ON CONFLICT DO NOTHING', [ip]);
+  await pool.query('DELETE FROM users WHERE username=$1', [req.params.username]);
   res.json({ success: true });
 });
 
 app.post('/api/admin/challenge', verifyAdmin, async (req, res) => {
   const { active, startDate, durationDays } = req.body;
-  const update = {
-    active:      !!active,
-    startDate:   startDate   || null,
-    durationDays: durationDays || 7,
-  };
-  await challenge.updateOne({ _id: 'config' }, { $set: update }, { upsert: true });
-  res.json({ success: true, challenge: update });
+  await pool.query(`
+    UPDATE challenge SET active=$1, start_date=$2, duration_days=$3 WHERE id='config'
+  `, [!!active, startDate || null, durationDays || 7]);
+  res.json({ success: true });
 });
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'index.html')));
 
 // ─── START ────────────────────────────────────────────────────────────────────
-connectDB()
+initDB()
   .then(() => app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`)))
-  .catch(e => { console.error("DB connect failed:", e.message); console.error("Full error:", JSON.stringify(e, null, 2)); process.exit(1); });
+  .catch(e => { console.error('DB init failed:', e.message); process.exit(1); });
