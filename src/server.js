@@ -42,6 +42,12 @@ async function initDB() {
       ip TEXT PRIMARY KEY
     );
     INSERT INTO challenge (id) VALUES ('config') ON CONFLICT DO NOTHING;
+    CREATE TABLE IF NOT EXISTS chat (
+      id SERIAL PRIMARY KEY,
+      username TEXT NOT NULL,
+      message TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
   `);
   ready = true;
   console.log('✅ Postgres ready');
@@ -224,6 +230,40 @@ app.post('/api/admin/challenge', verifyAdmin, async (req, res) => {
   await pool.query(`
     UPDATE challenge SET active=$1, start_date=$2, duration_days=$3 WHERE id='config'
   `, [!!active, startDate || null, durationDays || 7]);
+  res.json({ success: true });
+});
+
+// ─── CHAT ─────────────────────────────────────────────────────────────────────
+app.get('/api/chat', async (req, res) => {
+  const since = req.query.since || 0;
+  const rows = await pool.query(
+    'SELECT id, username, message, created_at FROM chat WHERE id > $1 ORDER BY created_at ASC LIMIT 100',
+    [since]
+  );
+  res.json({ messages: rows.rows });
+});
+
+app.post('/api/chat', async (req, res) => {
+  const { username, message } = req.body;
+  if (!username?.trim() || !message?.trim())
+    return res.status(400).json({ error: 'username and message required' });
+  if (message.trim().length > 300)
+    return res.status(400).json({ error: 'Message too long (max 300 chars)' });
+
+  // Check user exists
+  const u = await pool.query('SELECT username FROM users WHERE username=$1', [username.trim()]);
+  if (!u.rows.length)
+    return res.status(403).json({ error: 'Join the leaderboard first to chat' });
+
+  const result = await pool.query(
+    'INSERT INTO chat (username, message) VALUES ($1, $2) RETURNING id, username, message, created_at',
+    [username.trim(), message.trim()]
+  );
+  res.json({ success: true, message: result.rows[0] });
+});
+
+app.delete('/api/admin/chat/:id', verifyAdmin, async (req, res) => {
+  await pool.query('DELETE FROM chat WHERE id=$1', [req.params.id]);
   res.json({ success: true });
 });
 
