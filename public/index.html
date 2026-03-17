@@ -1056,7 +1056,14 @@ function toggleChat() {
   if (chatOpen) {
     unreadCount = 0;
     updateUnreadBadge();
-    if (!chatInitialized) { chatInitialized = true; loadChat(true); }
+    if (!chatInitialized) {
+      chatInitialized = true;
+      if (!getChatName()) {
+        askChatName();
+      } else {
+        loadChat(true);
+      }
+    }
     setTimeout(() => document.getElementById('chat-input')?.focus(), 300);
     scrollChatBottom();
   }
@@ -1121,17 +1128,47 @@ function scrollChatBottom() {
   if (c) setTimeout(() => c.scrollTop = c.scrollHeight, 50);
 }
 
+function getChatName() {
+  // Use leaderboard name if available, else use separate chat name key
+  return localStorage.getItem('sp_leaderboard_username') ||
+         localStorage.getItem('chat_username') || null;
+}
+
+function askChatName() {
+  // Show inline name prompt inside chat panel
+  const container = document.getElementById('chat-messages');
+  container.innerHTML = `
+    <div class="chat-no-user" style="padding:1.5rem 1rem;">
+      <div style="font-size:1.5rem;margin-bottom:0.8rem;">👋</div>
+      <div style="margin-bottom:1rem;color:var(--text);font-size:0.85rem;">Enter your name to start chatting:</div>
+      <input id="chat-name-input" class="chat-input" style="width:100%;margin-bottom:0.8rem;display:block;"
+        placeholder="Your name…" maxlength="30"
+        onkeydown="if(event.key==='Enter')saveChatName()">
+      <button class="chat-send" style="width:100%;border-radius:6px;height:36px;font-size:0.85rem;font-family:'Syne',sans-serif;font-weight:600;"
+        onclick="saveChatName()">JOIN CHAT</button>
+    </div>`;
+  setTimeout(() => document.getElementById('chat-name-input')?.focus(), 100);
+}
+
+function saveChatName() {
+  const input = document.getElementById('chat-name-input');
+  const name = input?.value?.trim();
+  if (!name) return;
+  localStorage.setItem('chat_username', name);
+  // Reload chat properly
+  document.getElementById('chat-messages').innerHTML = '<div class="chat-empty">Loading…</div>';
+  chatInitialized = false;
+  lastMsgId = 0;
+  loadChat(true);
+}
+
 async function sendChat() {
-  const myName = localStorage.getItem('sp_leaderboard_username');
+  const myName = getChatName();
   const input = document.getElementById('chat-input');
   const btn = document.getElementById('chat-send-btn');
   const msg = input?.value?.trim();
 
-  if (!myName) {
-    document.getElementById('chat-messages').innerHTML =
-      '<div class="chat-no-user">Join the leaderboard first to chat.<br>Open Super Productivity → click the leaderboard icon → set your name.</div>';
-    return;
-  }
+  if (!myName) { askChatName(); return; }
   if (!msg) return;
 
   btn.disabled = true;

@@ -51,6 +51,16 @@ async function initDB() {
   `);
   ready = true;
   console.log('✅ Postgres ready');
+
+  // Delete chat messages older than 2 days, run every hour
+  async function cleanOldChat() {
+    try {
+      const r = await pool.query("DELETE FROM chat WHERE created_at < NOW() - INTERVAL '2 days'");
+      if (r.rowCount > 0) console.log(`🗑️  Deleted ${r.rowCount} old chat messages`);
+    } catch(e) { console.warn('Chat cleanup failed:', e.message); }
+  }
+  cleanOldChat();
+  setInterval(cleanOldChat, 60 * 60 * 1000); // every hour
 }
 
 app.use((req, res, next) => {
@@ -249,11 +259,6 @@ app.post('/api/chat', async (req, res) => {
     return res.status(400).json({ error: 'username and message required' });
   if (message.trim().length > 300)
     return res.status(400).json({ error: 'Message too long (max 300 chars)' });
-
-  // Check user exists
-  const u = await pool.query('SELECT username FROM users WHERE username=$1', [username.trim()]);
-  if (!u.rows.length)
-    return res.status(403).json({ error: 'Join the leaderboard first to chat' });
 
   const result = await pool.query(
     'INSERT INTO chat (username, message) VALUES ($1, $2) RETURNING id, username, message, created_at',
