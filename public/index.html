@@ -836,6 +836,7 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
   flex-direction: column;
   gap: 0.4rem;
   z-index: 2;
+  position: relative; /* needed for absolute emoji panel */
 }
 
 /* Reply/edit bar */
@@ -855,7 +856,7 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
 .ct-reply-bar-close { background:none; border:none; color:var(--muted); cursor:pointer; font-size:1rem; padding:0; flex-shrink:0; transition:color .2s; }
 .ct-reply-bar-close:hover { color:var(--red); }
 
-/* Emoji panel — pops up above input */
+/* Emoji panel — floats ABOVE the input, absolute positioned */
 .ct-emoji-panel {
   display: none;
   flex-direction: column;
@@ -863,6 +864,12 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
+  position: absolute;
+  bottom: 100%;
+  left: 0; right: 0;
+  margin-bottom: 6px;
+  z-index: 100;
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.5);
 }
 .ct-emoji-panel.open { display:flex; }
 .ct-emoji-cats { display:flex; gap:2px; padding:5px 7px; border-bottom:1px solid var(--border); overflow-x:auto; }
@@ -1050,20 +1057,23 @@ document.addEventListener('keydown', e => {
 function switchTab(name, el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  document.getElementById('tab-lb').style.display   = name==='lb'  ? '' : 'none';
-  document.getElementById('tab-war').style.display  = name==='war' ? '' : 'none';
+  document.getElementById('tab-lb').style.display  = name==='lb'  ? '' : 'none';
+  document.getElementById('tab-war').style.display = name==='war' ? '' : 'none';
 
   const chatEl = document.getElementById('tab-chat');
   if (name === 'chat') {
-    // Calculate where the tabs bar ends so chat fills exactly below it
-    const tabsBar = document.querySelector('.tabs-container');
-    const top = tabsBar ? (tabsBar.getBoundingClientRect().bottom + window.scrollY) : 120;
-    chatEl.style.top = top + 'px';
     chatEl.style.display = 'flex';
     chatEl.classList.add('active-chat');
-    // Also hide .main padding interference
     document.querySelector('.main').style.padding = '0';
-    initChatTab();
+    // Use requestAnimationFrame so the DOM is rendered before measuring
+    requestAnimationFrame(() => {
+      const tabsBar = document.querySelector('.tabs-container');
+      if (tabsBar) {
+        const rect = tabsBar.getBoundingClientRect();
+        chatEl.style.top = (rect.bottom) + 'px';
+      }
+      initChatTab();
+    });
   } else {
     chatEl.style.display = 'none';
     chatEl.classList.remove('active-chat');
