@@ -592,42 +592,44 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
 
   <!-- CHAT TAB -->
   <div id="tab-chat" style="display:none;">
-    <div class="chat-tab-wrap">
-      <div class="chat-tab-header">GROUP <span style="color:var(--accent)">CHAT</span></div>
-      <div class="chat-tab-sub" id="ct-username-bar" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-        <span id="ct-username-text">— SET YOUR NAME TO CHAT —</span>
-        <button id="ct-change-name-btn" onclick="ctShowChangeName()" style="display:none;background:transparent;border:1px solid rgba(232,197,71,0.3);color:var(--accent);border-radius:4px;font-size:0.65rem;padding:3px 8px;cursor:pointer;font-family:inherit;letter-spacing:0.1em;">✏️ CHANGE</button>
+    <!-- WhatsApp-style: full viewport height, fixed input at bottom -->
+    <div class="ct-shell">
+
+      <!-- Header bar -->
+      <div class="ct-header">
+        <div class="ct-header-info">
+          <div class="ct-header-title">💬 Group Chat</div>
+          <div class="ct-header-sub" id="ct-username-text">— not joined —</div>
+        </div>
+        <div class="ct-header-count" id="ct-online-count"></div>
       </div>
-      <div id="ct-no-user" class="ct-no-user" style="display:none;">
-        <h3>💬 Join the Chat</h3>
-        <p>Enter your name to start chatting with the group.</p>
-        <div class="ct-user-setup">
-          <input class="ct-user-input" id="ct-name-input" placeholder="Your name…" maxlength="30" onkeydown="if(event.key==='Enter')saveChatUsername()">
-          <button class="ct-user-btn" onclick="saveChatUsername()">JOIN</button>
+
+      <!-- No user state -->
+      <div id="ct-no-user" class="ct-no-user-shell" style="display:none;">
+        <div class="ct-no-user-inner">
+          <div style="font-size:3rem;margin-bottom:1rem;">💬</div>
+          <h3 style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:0.08em;margin-bottom:0.5rem;">JOIN THE CHAT</h3>
+          <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1.5rem;line-height:1.6;">Your leaderboard name is used automatically.<br>Set it on the leaderboard first to chat.</p>
+          <div style="font-size:0.75rem;color:var(--muted);letter-spacing:0.1em;">Go to the Leaderboard tab → Click a row to set your name via the SP plugin.</div>
         </div>
       </div>
-      <div id="ct-chat-area" style="display:none;">
-        <div class="chat-tab-msgs" id="ct-messages"></div>
+
+      <!-- Messages area — scrollable, grows upward -->
+      <div class="ct-messages-shell" id="ct-chat-area" style="display:none;">
+        <div class="ct-messages-list" id="ct-messages"></div>
+      </div>
+
+      <!-- Bottom bar — sticky input -->
+      <div class="ct-bottom" id="ct-bottom" style="display:none;">
+        <!-- Reply/edit preview bar -->
         <div class="ct-reply-bar" id="ct-reply-bar">
-          <span id="ct-reply-text">↩ Replying to...</span>
+          <div class="ct-reply-bar-content">
+            <div class="ct-reply-bar-line"></div>
+            <span id="ct-reply-text" style="font-size:0.78rem;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+          </div>
           <button class="ct-reply-bar-close" onclick="cancelReply()">✕</button>
         </div>
-        <div class="ct-emoji-bar">
-          <span class="ct-emoji-pick" onclick="quickReactLast('👍')">👍</span>
-          <span class="ct-emoji-pick" onclick="quickReactLast('🔥')">🔥</span>
-          <span class="ct-emoji-pick" onclick="quickReactLast('💪')">💪</span>
-          <span class="ct-emoji-pick" onclick="quickReactLast('😂')">😂</span>
-          <span class="ct-emoji-pick" onclick="quickReactLast('❤️')">❤️</span>
-          <span class="ct-emoji-pick" onclick="quickReactLast('👑')">👑</span>
-        </div>
-        <div class="ct-input-row">
-          <button class="ct-emoji-trigger" onclick="toggleEmojiPicker()" title="Emoji">😊</button>
-          <textarea class="ct-textarea" id="ct-input" placeholder="Type a message…" rows="1"
-            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg();}"
-            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
-          <button class="ct-send-btn" id="ct-send-btn" onclick="sendChatMsg()">➤</button>
-        </div>
-        <!-- Full Emoji Picker Panel -->
+        <!-- Emoji picker — pops up above input -->
         <div class="ct-emoji-panel" id="ct-emoji-panel">
           <div class="ct-emoji-cats">
             <button class="ct-emoji-cat active" onclick="showEmojiCat('smileys',this)">😊</button>
@@ -641,128 +643,276 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
           </div>
           <div class="ct-emoji-grid" id="ct-emoji-grid"></div>
         </div>
+        <!-- Input row -->
+        <div class="ct-input-row">
+          <button class="ct-emoji-trigger" onclick="toggleEmojiPicker()" title="Emoji">😊</button>
+          <textarea class="ct-textarea" id="ct-input" placeholder="Type a message…" rows="1"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg();}"
+            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+          <button class="ct-send-btn" id="ct-send-btn" onclick="sendChatMsg()">➤</button>
+        </div>
       </div>
+
     </div>
   </div>
 
   <div id="plugin-content"></div>
 </div>
 
-<!-- ── CHAT TAB CONTENT ── -->
+<!-- ── CHAT TAB ── -->
 <style>
-.chat-tab-wrap { max-width:700px; margin:0 auto; }
-.chat-tab-header { font-family:'Bebas Neue',sans-serif; font-size:2.5rem; letter-spacing:0.08em; margin-bottom:0.3rem; }
-.chat-tab-sub { color:var(--muted); font-size:0.8rem; letter-spacing:0.1em; margin-bottom:1.5rem; }
-.chat-tab-msgs { display:flex; flex-direction:column; gap:0.8rem; min-height:300px; margin-bottom:1.2rem; }
-.ct-msg { display:flex; flex-direction:column; gap:0.3rem; animation:fadeSlide 0.3s ease both; }
+/* The chat tab takes over the full viewport below the header/tabs */
+#tab-chat {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 50;
+  display: none;
+  flex-direction: column;
+}
+#tab-chat.active-chat { display: flex; }
+
+/* Shell fills the screen */
+.ct-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg);
+}
+
+/* Header */
+.ct-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1.5rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: 2;
+}
+.ct-header-title {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text);
+}
+.ct-header-sub {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 1px;
+  letter-spacing: 0.05em;
+}
+.ct-header-count {
+  font-size: 0.72rem;
+  color: var(--green);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* No user state */
+.ct-no-user-shell {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ct-no-user-inner {
+  text-align: center;
+  padding: 2rem;
+  color: var(--muted);
+  max-width: 400px;
+}
+
+/* Messages area — scrollable, messages stack from bottom */
+.ct-messages-shell {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 1.5rem;
+  scroll-behavior: smooth;
+}
+.ct-messages-shell::-webkit-scrollbar { width: 4px; }
+.ct-messages-shell::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* Messages list — justify to end so newest is at bottom */
+.ct-messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  min-height: 100%;
+}
+
+/* Date separators */
+.ct-date-sep {
+  text-align: center;
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  padding: 0.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.ct-date-sep::before,.ct-date-sep::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* Individual message */
+.ct-msg { display:flex; flex-direction:column; gap:0.2rem; animation:ctSlideIn 0.2s ease both; max-width:100%; }
 .ct-msg.mine { align-items:flex-end; }
-.ct-msg-header { display:flex; align-items:center; gap:0.5rem; font-size:0.68rem; color:var(--muted); }
+@keyframes ctSlideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+.ct-msg-header { display:flex; align-items:center; gap:0.4rem; font-size:0.65rem; color:var(--muted); padding:0 0.3rem; }
 .ct-msg.mine .ct-msg-header { flex-direction:row-reverse; }
-.ct-msg-name { font-family:'Syne',sans-serif; font-weight:600; font-size:0.72rem; }
-.ct-bubble-wrap { display:flex; flex-direction:column; max-width:72%; }
+.ct-msg-name { font-family:'Syne',sans-serif; font-weight:600; font-size:0.7rem; }
+.ct-msg-time { font-size:0.6rem; color:var(--muted); opacity:.7; }
+
+.ct-bubble-wrap { display:flex; flex-direction:column; max-width:68%; }
+@media(max-width:600px){ .ct-bubble-wrap { max-width:85%; } }
 .ct-msg.mine .ct-bubble-wrap { align-items:flex-end; }
-.ct-reply-preview { font-size:0.68rem; color:var(--muted); background:rgba(255,255,255,0.04); border-left:2px solid var(--accent); padding:0.25rem 0.6rem; border-radius:3px; margin-bottom:0.2rem; }
-.ct-bubble { padding:0.6rem 0.9rem; border-radius:12px; font-size:0.84rem; line-height:1.45; word-break:break-word; position:relative; cursor:default; }
-.ct-msg:not(.mine) .ct-bubble { background:var(--surface2); border:1px solid var(--border); border-bottom-left-radius:2px; }
-.ct-msg.mine .ct-bubble { background:linear-gradient(135deg,rgba(232,197,71,0.2),rgba(255,107,53,0.15)); border:1px solid rgba(232,197,71,0.25); border-bottom-right-radius:2px; }
-.ct-edited { font-size:0.6rem; color:var(--muted); margin-top:2px; }
-.ct-reactions { display:flex; flex-wrap:wrap; gap:0.3rem; margin-top:0.3rem; }
-.ct-reaction { display:flex; align-items:center; gap:3px; background:var(--surface2); border:1px solid var(--border); border-radius:20px; padding:2px 8px; font-size:0.75rem; cursor:pointer; transition:all 0.15s; user-select:none; }
-.ct-reaction:hover { border-color:var(--accent); background:rgba(232,197,71,0.08); }
-.ct-reaction.mine { border-color:rgba(232,197,71,0.4); background:rgba(232,197,71,0.08); }
-.ct-reaction-count { font-family:'Syne',sans-serif; font-size:0.68rem; color:var(--muted); }
-.ct-actions { display:none; flex-direction:row; gap:0.4rem; margin-top:0.25rem; }
+
+.ct-reply-preview {
+  font-size:0.68rem; color:var(--muted);
+  background:rgba(255,255,255,0.04);
+  border-left:2px solid var(--accent);
+  padding:0.2rem 0.6rem; border-radius:3px;
+  margin-bottom:0.2rem;
+  max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+
+.ct-bubble {
+  padding:0.55rem 0.9rem;
+  border-radius:14px;
+  font-size:0.84rem; line-height:1.5;
+  word-break:break-word;
+  position:relative;
+}
+.ct-msg:not(.mine) .ct-bubble {
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-bottom-left-radius:4px;
+  color:var(--text);
+}
+.ct-msg.mine .ct-bubble {
+  background:linear-gradient(135deg,rgba(232,197,71,0.18),rgba(255,107,53,0.12));
+  border:1px solid rgba(232,197,71,0.22);
+  border-bottom-right-radius:4px;
+  color:var(--text);
+}
+.ct-edited { font-size:0.58rem; color:var(--muted); margin-top:1px; }
+
+/* Reactions */
+.ct-reactions { display:flex; flex-wrap:wrap; gap:3px; margin-top:4px; }
+.ct-reaction {
+  display:flex; align-items:center; gap:2px;
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:20px; padding:2px 7px; font-size:0.78rem;
+  cursor:pointer; transition:all 0.15s; user-select:none;
+}
+.ct-reaction:hover,.ct-reaction.mine { border-color:rgba(232,197,71,0.4); background:rgba(232,197,71,0.08); }
+.ct-reaction-count { font-size:0.65rem; color:var(--muted); }
+
+/* Action buttons — appear on hover */
+.ct-actions { display:none; flex-direction:row; gap:3px; margin-top:3px; }
 .ct-msg:hover .ct-actions { display:flex; }
 .ct-msg.mine .ct-actions { justify-content:flex-end; }
-.ct-action-btn { background:var(--surface2); border:1px solid var(--border); border-radius:4px; color:var(--muted); font-size:0.65rem; padding:2px 7px; cursor:pointer; transition:all 0.15s; font-family:'Syne',sans-serif; }
+.ct-action-btn {
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:4px; color:var(--muted);
+  font-size:0.62rem; padding:2px 6px;
+  cursor:pointer; transition:all 0.15s;
+  font-family:'Syne',sans-serif;
+}
 .ct-action-btn:hover { border-color:var(--accent); color:var(--accent); }
 .ct-action-btn.danger:hover { border-color:var(--red); color:var(--red); }
-.ct-reply-bar { background:rgba(232,197,71,0.06); border:1px solid rgba(232,197,71,0.2); border-radius:6px; padding:0.5rem 0.8rem; margin-bottom:0.6rem; display:none; align-items:center; justify-content:space-between; font-size:0.75rem; color:var(--muted); }
-.ct-reply-bar.show { display:flex; }
-.ct-reply-bar-close { background:none; border:none; color:var(--muted); cursor:pointer; font-size:1rem; }
-.ct-input-row { display:flex; gap:0.6rem; align-items:flex-end; }
-.ct-textarea { flex:1; background:var(--surface); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:0.84rem; padding:0.65rem 1rem; outline:none; resize:none; transition:border-color 0.2s; line-height:1.4; }
-.ct-textarea:focus { border-color:rgba(232,197,71,0.4); }
-.ct-send-btn { width:40px; height:40px; border-radius:8px; background:var(--accent); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; transition:all 0.2s; flex-shrink:0; }
-.ct-send-btn:hover { background:#f0cc55; transform:scale(1.05); }
-.ct-send-btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
-.ct-emoji-trigger {
-  width: 40px; height: 40px;
-  border-radius: 8px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  cursor: pointer;
-  font-size: 1.2rem;
-  display: flex; align-items: center; justify-content: center;
+
+/* Bottom bar — fixed at bottom */
+.ct-bottom {
   flex-shrink: 0;
-  transition: all 0.2s;
-  align-self: flex-end;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 0.6rem 1rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  z-index: 2;
 }
-.ct-emoji-trigger:hover { border-color: var(--accent); background: rgba(232,197,71,0.08); }
+
+/* Reply/edit bar */
+.ct-reply-bar {
+  display: none;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(232,197,71,0.06);
+  border: 1px solid rgba(232,197,71,0.2);
+  border-radius: 8px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.75rem;
+}
+.ct-reply-bar.show { display:flex; }
+.ct-reply-bar-content { display:flex; align-items:center; gap:0.5rem; flex:1; overflow:hidden; }
+.ct-reply-bar-line { width:3px; height:28px; background:var(--accent); border-radius:2px; flex-shrink:0; }
+.ct-reply-bar-close { background:none; border:none; color:var(--muted); cursor:pointer; font-size:1rem; padding:0; flex-shrink:0; transition:color .2s; }
+.ct-reply-bar-close:hover { color:var(--red); }
+
+/* Emoji panel — pops up above input */
 .ct-emoji-panel {
   display: none;
   flex-direction: column;
-  background: var(--surface);
+  background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: 10px;
-  margin-bottom: 0.6rem;
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
 }
-.ct-emoji-panel.open { display: flex; }
-.ct-emoji-cats {
-  display: flex;
-  gap: 2px;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface2);
-  overflow-x: auto;
+.ct-emoji-panel.open { display:flex; }
+.ct-emoji-cats { display:flex; gap:2px; padding:5px 7px; border-bottom:1px solid var(--border); overflow-x:auto; }
+.ct-emoji-cats::-webkit-scrollbar { height:0; }
+.ct-emoji-cat { background:none; border:none; border-radius:5px; font-size:1.1rem; padding:3px 5px; cursor:pointer; opacity:.5; transition:all .15s; flex-shrink:0; }
+.ct-emoji-cat:hover { opacity:1; background:rgba(232,197,71,0.1); }
+.ct-emoji-cat.active { opacity:1; background:rgba(232,197,71,0.15); outline:1px solid rgba(232,197,71,0.3); }
+.ct-emoji-grid { display:grid; grid-template-columns:repeat(9,1fr); gap:2px; padding:6px; max-height:160px; overflow-y:auto; }
+.ct-emoji-grid::-webkit-scrollbar { width:3px; }
+.ct-emoji-grid::-webkit-scrollbar-thumb { background:var(--border); }
+.ct-emoji-item { font-size:1.3rem; padding:4px; border-radius:5px; cursor:pointer; text-align:center; border:none; background:none; transition:all 0.1s; line-height:1; }
+.ct-emoji-item:hover { background:rgba(232,197,71,0.12); transform:scale(1.2); }
+
+/* Input row */
+.ct-input-row { display:flex; gap:0.5rem; align-items:flex-end; }
+.ct-emoji-trigger {
+  width:40px; height:40px; border-radius:50%;
+  background:transparent; border:none;
+  cursor:pointer; font-size:1.4rem;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0; align-self:flex-end;
+  transition:transform .2s; color:var(--muted);
 }
-.ct-emoji-cats::-webkit-scrollbar { height: 0; }
-.ct-emoji-cat {
-  background: none;
-  border: none;
-  border-radius: 6px;
-  font-size: 1.1rem;
-  padding: 4px 6px;
-  cursor: pointer;
-  opacity: 0.5;
-  transition: all 0.15s;
-  flex-shrink: 0;
+.ct-emoji-trigger:hover { transform:scale(1.15); color:var(--accent); }
+.ct-textarea {
+  flex:1;
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:22px;
+  color:var(--text);
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.88rem;
+  padding:0.6rem 1rem;
+  outline:none; resize:none;
+  transition:border-color 0.2s;
+  line-height:1.4;
+  max-height:120px;
 }
-.ct-emoji-cat:hover { opacity: 1; background: rgba(232,197,71,0.1); }
-.ct-emoji-cat.active { opacity: 1; background: rgba(232,197,71,0.15); outline: 1px solid rgba(232,197,71,0.3); }
-.ct-emoji-grid {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 2px;
-  padding: 8px;
-  max-height: 180px;
-  overflow-y: auto;
+.ct-textarea:focus { border-color:rgba(232,197,71,0.4); }
+.ct-textarea::placeholder { color:var(--muted); }
+.ct-send-btn {
+  width:40px; height:40px; border-radius:50%;
+  background:var(--accent); border:none;
+  cursor:pointer; font-size:1rem;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0; align-self:flex-end;
+  transition:all 0.2s;
+  box-shadow:0 2px 8px rgba(232,197,71,0.3);
 }
-.ct-emoji-grid::-webkit-scrollbar { width: 4px; }
-.ct-emoji-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-.ct-emoji-item {
-  font-size: 1.3rem;
-  padding: 5px;
-  border-radius: 6px;
-  cursor: pointer;
-  text-align: center;
-  transition: all 0.1s;
-  line-height: 1;
-  border: none;
-  background: none;
-}
-.ct-emoji-item:hover { background: rgba(232,197,71,0.12); transform: scale(1.2); }
-.ct-emoji-bar { display:flex; gap:0.4rem; margin-bottom:0.5rem; flex-wrap:wrap; }
-.ct-emoji-pick { background:var(--surface2); border:1px solid var(--border); border-radius:20px; padding:3px 10px; font-size:1rem; cursor:pointer; transition:all 0.15s; }
-.ct-emoji-pick:hover { border-color:var(--accent); transform:scale(1.15); }
-.ct-no-user { text-align:center; padding:3rem 2rem; color:var(--muted); }
-.ct-no-user h3 { font-family:'Bebas Neue',sans-serif; font-size:1.5rem; margin-bottom:0.5rem; color:var(--text); }
-.ct-user-setup { display:flex; gap:0.6rem; margin-top:1rem; }
-.ct-user-input { flex:1; background:var(--surface2); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:0.84rem; padding:0.6rem 1rem; outline:none; }
-.ct-user-input:focus { border-color:var(--accent); }
-.ct-user-btn { background:var(--accent); border:none; border-radius:6px; color:#000; font-family:'Syne',sans-serif; font-weight:700; font-size:0.8rem; padding:0.6rem 1.2rem; cursor:pointer; }
+.ct-send-btn:hover { background:#f0cc55; transform:scale(1.08); }
+.ct-send-btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
 </style>
 
 <!-- ── WAR INFO MODAL ── -->
@@ -901,9 +1051,17 @@ function switchTab(name, el){
   el.classList.add('active');
   document.getElementById('tab-lb').style.display   = name==='lb'  ? '' : 'none';
   document.getElementById('tab-war').style.display  = name==='war' ? '' : 'none';
-  document.getElementById('tab-chat').style.display = name==='chat'? '' : 'none';
-  if(name==='war')  loadWar();
-  if(name==='chat') initChatTab();
+  // Chat takes over full screen — hide header/ticker/tabs when active
+  const chatEl = document.getElementById('tab-chat');
+  if (name === 'chat') {
+    chatEl.style.display = 'flex';
+    chatEl.classList.add('active-chat');
+    initChatTab();
+  } else {
+    chatEl.style.display = 'none';
+    chatEl.classList.remove('active-chat');
+  }
+  if(name==='war') loadWar();
 }
 
 // ── JUMP TO MY RANK ────────────────────────────────────────────────────────
@@ -1300,35 +1458,39 @@ let ctAllMessages = [];
 let ctInited = false;
 
 function getChatUser() {
+  // Only use leaderboard username — no separate chat name
   return localStorage.getItem('sp_leaderboard_username') || localStorage.getItem('chat_username') || null;
 }
 
 function saveChatUsername() {
+  // Kept for compatibility but no longer called from UI
   const val = document.getElementById('ct-name-input')?.value?.trim();
   if (!val) return;
-  // Save under both keys so personal quote + jump-to-rank also work
   localStorage.setItem('chat_username', val);
   localStorage.setItem('sp_leaderboard_username', val);
-  ctInited = false; // allow re-init with new user
-  ctLastId = 0;
-  ctAllMessages = [];
+  ctInited = false; ctLastId = 0; ctAllMessages = [];
   initChatTab();
 }
 
 function initChatTab() {
   const user = getChatUser();
   const text = document.getElementById('ct-username-text');
-  const changeBtn = document.getElementById('ct-change-name-btn');
-  if (text) text.textContent = user ? `Chatting as ${user}` : '— SET YOUR NAME TO CHAT —';
-  if (changeBtn) changeBtn.style.display = user ? '' : 'none';
+  if (text) text.textContent = user ? user : '— not joined —';
+
+  const noUser   = document.getElementById('ct-no-user');
+  const chatArea = document.getElementById('ct-chat-area');
+  const bottom   = document.getElementById('ct-bottom');
 
   if (!user) {
-    document.getElementById('ct-no-user').style.display = '';
-    document.getElementById('ct-chat-area').style.display = 'none';
+    if (noUser)   noUser.style.display   = '';
+    if (chatArea) chatArea.style.display = 'none';
+    if (bottom)   bottom.style.display   = 'none';
     return;
   }
-  document.getElementById('ct-no-user').style.display = 'none';
-  document.getElementById('ct-chat-area').style.display = '';
+
+  if (noUser)   noUser.style.display   = 'none';
+  if (chatArea) chatArea.style.display = '';
+  if (bottom)   bottom.style.display   = '';
 
   if (!ctInited) {
     ctInited = true;
@@ -1338,12 +1500,7 @@ function initChatTab() {
 }
 
 function ctShowChangeName() {
-  // Show the name input area again
-  const user = getChatUser();
-  document.getElementById('ct-no-user').style.display = '';
-  document.getElementById('ct-chat-area').style.display = 'none';
-  document.getElementById('ct-name-input').value = user || '';
-  document.getElementById('ct-name-input').focus();
+  // No longer used
 }
 
 async function loadChatMessages(initial = false) {
@@ -1367,10 +1524,22 @@ function renderAllMessages() {
   const container = document.getElementById('ct-messages');
   container.innerHTML = '';
   if (!ctAllMessages.length) {
-    container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem;font-size:0.85rem;">No messages yet. Say hi! 👋</div>';
+    container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:3rem 2rem;font-size:0.85rem;opacity:.6;">No messages yet.<br>Be the first to say hi! 👋</div>';
     return;
   }
-  ctAllMessages.forEach(m => appendMessage(m, false));
+  let lastDate = null;
+  ctAllMessages.forEach(m => {
+    // Date separator
+    const msgDate = new Date(m.created_at).toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'});
+    if (msgDate !== lastDate) {
+      lastDate = msgDate;
+      const sep = document.createElement('div');
+      sep.className = 'ct-date-sep';
+      sep.textContent = msgDate;
+      container.appendChild(sep);
+    }
+    appendMessage(m, false);
+  });
   scrollChatTab();
 }
 
@@ -1420,8 +1589,8 @@ function appendMessage(m, scroll=true) {
 }
 
 function scrollChatTab() {
-  const c = document.getElementById('ct-messages');
-  if (c) setTimeout(() => c.scrollTop = c.scrollHeight, 50);
+  const shell = document.getElementById('ct-chat-area');
+  if (shell) setTimeout(() => shell.scrollTop = shell.scrollHeight, 50);
 }
 
 function startReply(id, username, preview) {
