@@ -750,8 +750,8 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
 }
 .ct-date-sep::before,.ct-date-sep::after { content:''; flex:1; height:1px; background:var(--border); }
 
-/* Individual message */
-.ct-msg { display:flex; flex-direction:column; gap:0.2rem; animation:ctSlideIn 0.2s ease both; max-width:100%; }
+/* Action toolbar — floats beside the bubble, never moves content */
+.ct-msg { display:flex; flex-direction:column; gap:0.2rem; animation:ctSlideIn 0.2s ease both; max-width:100%; position:relative; }
 .ct-msg.mine { align-items:flex-end; }
 @keyframes ctSlideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
 
@@ -761,7 +761,7 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
 .ct-msg-time { font-size:0.6rem; color:var(--muted); opacity:.7; }
 
 .ct-bubble-wrap { display:flex; flex-direction:column; max-width:68%; }
-@media(max-width:600px){ .ct-bubble-wrap { max-width:85%; } }
+@media(max-width:600px){ .ct-bubble-wrap { max-width:82%; } }
 .ct-msg.mine .ct-bubble-wrap { align-items:flex-end; }
 
 .ct-reply-preview {
@@ -794,7 +794,7 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
 }
 .ct-edited { font-size:0.58rem; color:var(--muted); margin-top:1px; }
 
-/* Reactions */
+/* Reactions — stay below bubble, no layout shift */
 .ct-reactions { display:flex; flex-wrap:wrap; gap:3px; margin-top:4px; }
 .ct-reaction {
   display:flex; align-items:center; gap:2px;
@@ -805,19 +805,45 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
 .ct-reaction:hover,.ct-reaction.mine { border-color:rgba(232,197,71,0.4); background:rgba(232,197,71,0.08); }
 .ct-reaction-count { font-size:0.65rem; color:var(--muted); }
 
-/* Action buttons — appear on hover */
-.ct-actions { display:none; flex-direction:row; gap:3px; margin-top:3px; }
-.ct-msg:hover .ct-actions { display:flex; }
-.ct-msg.mine .ct-actions { justify-content:flex-end; }
-.ct-action-btn {
-  background:var(--surface2); border:1px solid var(--border);
-  border-radius:4px; color:var(--muted);
-  font-size:0.62rem; padding:2px 6px;
-  cursor:pointer; transition:all 0.15s;
-  font-family:'Syne',sans-serif;
+/* ── FLOATING SIDE ACTIONS — never cause layout shift ── */
+/* Wrapper holds bubble + floating actions side by side */
+.ct-bubble-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
 }
-.ct-action-btn:hover { border-color:var(--accent); color:var(--accent); }
-.ct-action-btn.danger:hover { border-color:var(--red); color:var(--red); }
+.ct-msg.mine .ct-bubble-row { flex-direction: row-reverse; }
+
+/* The floating action bar — sits to the side, absolute so no layout impact */
+.ct-actions {
+  display: none;
+  flex-direction: row;
+  gap: 2px;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 3px 5px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.ct-msg:hover .ct-actions { display: flex; }
+
+.ct-action-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 3px 5px;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: all 0.15s;
+  line-height: 1;
+}
+.ct-action-btn:hover { background: rgba(232,197,71,0.12); color: var(--accent); }
+.ct-action-btn.danger:hover { background: rgba(255,71,87,0.1); color: var(--red); }
 
 /* Bottom bar — fixed at bottom */
 .ct-bottom {
@@ -1575,25 +1601,27 @@ function appendMessage(m, scroll=true) {
     return `<span class="ct-reaction${myReact?' mine':''}" onclick="toggleReact(${m.id},'${emoji}')">${emoji} <span class="ct-reaction-count">${users.length}</span></span>`;
   }).join('');
 
-  // Action buttons
-  const replyBtn = `<button class="ct-action-btn" onclick="startReply(${m.id},'${esc(m.username)}','${esc(m.message.slice(0,40))}')">↩ Reply</button>`;
-  const reactBtn = `<button class="ct-action-btn" onclick="showEmojiPick(${m.id})">😊</button>`;
-  const editBtn  = isMine ? `<button class="ct-action-btn" onclick="startEdit(${m.id},'${esc(m.message)}')">✏️ Edit</button>` : '';
-  const delBtn   = isMine ? `<button class="ct-action-btn danger" onclick="deleteMsg(${m.id})">🗑️</button>` : '';
-
+  // Action buttons are now inline in the bubble-row template above
   const div = document.createElement('div');
   div.className = `ct-msg${isMine?' mine':''}`;
   div.id = `ctmsg-${m.id}`;
   div.innerHTML = `
     <div class="ct-msg-header">
-      <div class="ct-msg-name" style="color:${color}">${esc(m.username)}</div>
-      <div style="font-size:0.6rem;color:var(--muted)">${time}</div>
+      <span class="ct-msg-name" style="color:${color}">${esc(m.username)}</span>
+      <span class="ct-msg-time">${time}</span>
     </div>
-    <div class="ct-bubble-wrap">
-      ${replyHtml}
-      <div class="ct-bubble">${esc(m.message)}${m.edited?'<div class="ct-edited">edited</div>':''}</div>
-      ${reactHtml ? `<div class="ct-reactions">${reactHtml}</div>` : `<div class="ct-reactions" id="ctreact-${m.id}"></div>`}
-      <div class="ct-actions">${replyBtn}${reactBtn}${editBtn}${delBtn}</div>
+    <div class="ct-bubble-row">
+      <div class="ct-bubble-wrap">
+        ${replyHtml}
+        <div class="ct-bubble">${esc(m.message)}${m.edited?'<span class="ct-edited"> · edited</span>':''}</div>
+        ${reactHtml ? `<div class="ct-reactions">${reactHtml}</div>` : `<div class="ct-reactions" id="ctreact-${m.id}"></div>`}
+      </div>
+      <div class="ct-actions">
+        <button class="ct-action-btn" title="Reply" onclick="startReply(${m.id},'${esc(m.username)}','${esc(m.message.slice(0,40))}')">↩</button>
+        <button class="ct-action-btn" title="React" onclick="showEmojiPick(${m.id})">😊</button>
+        ${isMine ? `<button class="ct-action-btn" title="Edit" onclick="startEdit(${m.id},'${esc(m.message)}')">✏️</button>` : ''}
+        ${isMine ? `<button class="ct-action-btn danger" title="Delete" onclick="deleteMsg(${m.id})">🗑️</button>` : ''}
+      </div>
     </div>`;
   container.appendChild(div);
   if (scroll) scrollChatTab();
