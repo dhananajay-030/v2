@@ -661,13 +661,14 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
 
 <!-- ── CHAT TAB ── -->
 <style>
-/* The chat tab takes over the full viewport below the header/tabs */
+/* Chat takes over everything below the tabs bar */
 #tab-chat {
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
+  left: 0; right: 0; bottom: 0;
   z-index: 50;
   display: none;
   flex-direction: column;
+  /* top is set dynamically by JS */
 }
 #tab-chat.active-chat { display: flex; }
 
@@ -1051,15 +1052,22 @@ function switchTab(name, el){
   el.classList.add('active');
   document.getElementById('tab-lb').style.display   = name==='lb'  ? '' : 'none';
   document.getElementById('tab-war').style.display  = name==='war' ? '' : 'none';
-  // Chat takes over full screen — hide header/ticker/tabs when active
+
   const chatEl = document.getElementById('tab-chat');
   if (name === 'chat') {
+    // Calculate where the tabs bar ends so chat fills exactly below it
+    const tabsBar = document.querySelector('.tabs-container');
+    const top = tabsBar ? (tabsBar.getBoundingClientRect().bottom + window.scrollY) : 120;
+    chatEl.style.top = top + 'px';
     chatEl.style.display = 'flex';
     chatEl.classList.add('active-chat');
+    // Also hide .main padding interference
+    document.querySelector('.main').style.padding = '0';
     initChatTab();
   } else {
     chatEl.style.display = 'none';
     chatEl.classList.remove('active-chat');
+    document.querySelector('.main').style.padding = '';
   }
   if(name==='war') loadWar();
 }
