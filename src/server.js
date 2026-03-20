@@ -7,7 +7,15 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin1234';
 
-app.use(cors());
+// ─── CORS — allow all origins including null (Electron file:// plugin iframes) ──
+app.use(cors({ origin: (origin, cb) => cb(null, true), credentials: true }));
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, x-admin-token');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -122,8 +130,6 @@ app.post('/api/submit', async (req, res) => {
 });
 
 // ─── POST /api/rename ────────────────────────────────────────────────────────
-// Renames a user: carries over ALL daily_ms history to the new name.
-// Deletes old username, inserts new one. Blocked if new name already taken.
 app.post('/api/rename', async (req, res) => {
   const { oldUsername, newUsername } = req.body;
   if (!oldUsername?.trim() || !newUsername?.trim())
@@ -134,36 +140,33 @@ app.post('/api/rename', async (req, res) => {
   const ip = getIP(req);
 
   if (oldName === newName)
-    return res.json({ success: true }); // nothing to do
+    return res.json({ success: true });
 
-  // Find old user — must exist and match this IP
   const oldUser = await pool.query('SELECT * FROM users WHERE username=$1', [oldName]);
   if (!oldUser.rows.length)
     return res.status(404).json({ error: 'old_user_not_found' });
 
-  // IP must match (security — only the same device can rename)
-  if (oldUser.rows[0].ip !== ip && oldUser.rows[0].ip !== 'unknown')
+  // Skip IP check if IP is unknown (Electron null-origin requests may not carry real IP)
+  const storedIp = oldUser.rows[0].ip;
+  if (storedIp && storedIp !== 'unknown' && ip !== 'unknown' && storedIp !== ip)
     return res.status(403).json({ error: 'ip_mismatch' });
 
-  // New name must not already exist
   const taken = await pool.query('SELECT username FROM users WHERE username=$1', [newName]);
   if (taken.rows.length)
     return res.status(409).json({ error: 'username_taken' });
 
-  const dailyMs   = oldUser.rows[0].daily_ms || {};
-  const joinedAt  = oldUser.rows[0].joined_at;
+  const dailyMs  = oldUser.rows[0].daily_ms || {};
+  const joinedAt = oldUser.rows[0].joined_at;
 
-  // Insert new, delete old — in a transaction
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     await client.query(
       `INSERT INTO users (username, ip, daily_ms, joined_at, last_seen)
        VALUES ($1, $2, $3, $4, NOW())`,
-      [newName, ip, JSON.stringify(dailyMs), joinedAt]
+      [newName, storedIp, JSON.stringify(dailyMs), joinedAt]
     );
     await client.query('DELETE FROM users WHERE username=$1', [oldName]);
-    // Update chat messages too so history shows new name
     await client.query('UPDATE chat SET username=$1 WHERE username=$2', [newName, oldName]);
     await client.query('COMMIT');
     res.json({ success: true });
