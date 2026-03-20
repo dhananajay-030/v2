@@ -594,7 +594,10 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
   <div id="tab-chat" style="display:none;">
     <div class="chat-tab-wrap">
       <div class="chat-tab-header">GROUP <span style="color:var(--accent)">CHAT</span></div>
-      <div class="chat-tab-sub" id="ct-username-bar">— SET YOUR NAME TO CHAT —</div>
+      <div class="chat-tab-sub" id="ct-username-bar" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <span id="ct-username-text">— SET YOUR NAME TO CHAT —</span>
+        <button id="ct-change-name-btn" onclick="ctShowChangeName()" style="display:none;background:transparent;border:1px solid rgba(232,197,71,0.3);color:var(--accent);border-radius:4px;font-size:0.65rem;padding:3px 8px;cursor:pointer;font-family:inherit;letter-spacing:0.1em;">✏️ CHANGE</button>
+      </div>
       <div id="ct-no-user" class="ct-no-user" style="display:none;">
         <h3>💬 Join the Chat</h3>
         <p>Enter your name to start chatting with the group.</p>
@@ -1304,14 +1307,21 @@ function getChatUser() {
 function saveChatUsername() {
   const val = document.getElementById('ct-name-input')?.value?.trim();
   if (!val) return;
+  // Save under both keys so personal quote + jump-to-rank also work
   localStorage.setItem('chat_username', val);
+  localStorage.setItem('sp_leaderboard_username', val);
+  ctInited = false; // allow re-init with new user
+  ctLastId = 0;
+  ctAllMessages = [];
   initChatTab();
 }
 
 function initChatTab() {
   const user = getChatUser();
-  const bar = document.getElementById('ct-username-bar');
-  if (bar) bar.textContent = user ? `Chatting as ${user}` : '— SET YOUR NAME TO CHAT —';
+  const text = document.getElementById('ct-username-text');
+  const changeBtn = document.getElementById('ct-change-name-btn');
+  if (text) text.textContent = user ? `Chatting as ${user}` : '— SET YOUR NAME TO CHAT —';
+  if (changeBtn) changeBtn.style.display = user ? '' : 'none';
 
   if (!user) {
     document.getElementById('ct-no-user').style.display = '';
@@ -1326,6 +1336,15 @@ function initChatTab() {
     loadChatMessages(true);
     if (!ctPollTimer) ctPollTimer = setInterval(() => loadChatMessages(false), 4000);
   }
+}
+
+function ctShowChangeName() {
+  // Show the name input area again
+  const user = getChatUser();
+  document.getElementById('ct-no-user').style.display = '';
+  document.getElementById('ct-chat-area').style.display = 'none';
+  document.getElementById('ct-name-input').value = user || '';
+  document.getElementById('ct-name-input').focus();
 }
 
 async function loadChatMessages(initial = false) {
