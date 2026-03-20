@@ -52,7 +52,6 @@ async function initDB() {
   ready = true;
   console.log('✅ Postgres ready');
 
-  // Delete chat messages older than 2 days, run every hour
   async function cleanOldChat() {
     try {
       const r = await pool.query("DELETE FROM chat WHERE created_at < NOW() - INTERVAL '2 days'");
@@ -60,7 +59,7 @@ async function initDB() {
     } catch(e) { console.warn('Chat cleanup failed:', e.message); }
   }
   cleanOldChat();
-  setInterval(cleanOldChat, 60 * 60 * 1000); // every hour
+  setInterval(cleanOldChat, 60 * 60 * 1000);
 }
 
 app.use((req, res, next) => {
@@ -100,19 +99,16 @@ app.post('/api/submit', async (req, res) => {
   const today = getTodayIST();
   const name  = username.trim();
 
-  // Check banned IP
   const banned = await pool.query('SELECT ip FROM deleted_ips WHERE ip=$1', [ip]);
   if (banned.rows.length && !allowRejoin)
     return res.status(403).json({ error: 'removed' });
 
   if (allowRejoin) await pool.query('DELETE FROM deleted_ips WHERE ip=$1', [ip]);
 
-  // Block same IP different username
   const conflict = await pool.query('SELECT username FROM users WHERE ip=$1 AND username!=$2', [ip, name]);
   if (conflict.rows.length)
     return res.status(409).json({ error: 'ip_conflict', existing: conflict.rows[0].username });
 
-  // Upsert user
   await pool.query(`
     INSERT INTO users (username, ip, daily_ms, last_seen)
     VALUES ($1, $2, $3, NOW())
@@ -125,6 +121,61 @@ app.post('/api/submit', async (req, res) => {
   res.json({ success: true });
 });
 
+// ─── POST /api/rename ────────────────────────────────────────────────────────
+// Renames a user: carries over ALL daily_ms history to the new name.
+// Deletes old username, inserts new one. Blocked if new name already taken.
+app.post('/api/rename', async (req, res) => {
+  const { oldUsername, newUsername } = req.body;
+  if (!oldUsername?.trim() || !newUsername?.trim())
+    return res.status(400).json({ error: 'oldUsername and newUsername required' });
+
+  const oldName = oldUsername.trim();
+  const newName = newUsername.trim();
+  const ip = getIP(req);
+
+  if (oldName === newName)
+    return res.json({ success: true }); // nothing to do
+
+  // Find old user — must exist and match this IP
+  const oldUser = await pool.query('SELECT * FROM users WHERE username=$1', [oldName]);
+  if (!oldUser.rows.length)
+    return res.status(404).json({ error: 'old_user_not_found' });
+
+  // IP must match (security — only the same device can rename)
+  if (oldUser.rows[0].ip !== ip && oldUser.rows[0].ip !== 'unknown')
+    return res.status(403).json({ error: 'ip_mismatch' });
+
+  // New name must not already exist
+  const taken = await pool.query('SELECT username FROM users WHERE username=$1', [newName]);
+  if (taken.rows.length)
+    return res.status(409).json({ error: 'username_taken' });
+
+  const dailyMs   = oldUser.rows[0].daily_ms || {};
+  const joinedAt  = oldUser.rows[0].joined_at;
+
+  // Insert new, delete old — in a transaction
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `INSERT INTO users (username, ip, daily_ms, joined_at, last_seen)
+       VALUES ($1, $2, $3, $4, NOW())`,
+      [newName, ip, JSON.stringify(dailyMs), joinedAt]
+    );
+    await client.query('DELETE FROM users WHERE username=$1', [oldName]);
+    // Update chat messages too so history shows new name
+    await client.query('UPDATE chat SET username=$1 WHERE username=$2', [newName, oldName]);
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch(e) {
+    await client.query('ROLLBACK');
+    console.error('Rename failed:', e.message);
+    res.status(500).json({ error: 'rename_failed' });
+  } finally {
+    client.release();
+  }
+});
+
 // ─── GET /api/leaderboard ─────────────────────────────────────────────────────
 app.get('/api/leaderboard', async (req, res) => {
   const today = getTodayIST();
@@ -135,7 +186,7 @@ app.get('/api/leaderboard', async (req, res) => {
   const list = all.rows
     .map(u => {
       const lastSeen = u.last_seen ? new Date(u.last_seen).getTime() : 0;
-      const isOnline = (now - lastSeen) < 3 * 60 * 1000; // online if seen < 3min ago
+      const isOnline = (now - lastSeen) < 3 * 60 * 1000;
       return {
         username: u.username,
         todayMs:  u.daily_ms?.[today] || 0,
