@@ -591,72 +591,65 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
   </div>
 
   <!-- CHAT TAB -->
-  <div id="tab-chat" style="display:none;">
-    <!-- WhatsApp-style: full viewport height, fixed input at bottom -->
-    <div class="ct-shell">
-
-      <!-- Header bar -->
-      <div class="ct-header">
-        <div class="ct-header-info">
-          <div class="ct-header-title">💬 Group Chat</div>
-          <div class="ct-header-sub" id="ct-username-text">— not joined —</div>
-        </div>
-        <div class="ct-header-count" id="ct-online-count"></div>
-      </div>
-
-      <!-- No user state -->
-      <div id="ct-no-user" class="ct-no-user-shell" style="display:none;">
-        <div class="ct-no-user-inner">
-          <div style="font-size:3rem;margin-bottom:1rem;">💬</div>
-          <h3 style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:0.08em;margin-bottom:0.5rem;">JOIN THE CHAT</h3>
-          <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1.5rem;line-height:1.6;">Your leaderboard name is used automatically.<br>Set it on the leaderboard first to chat.</p>
-          <div style="font-size:0.75rem;color:var(--muted);letter-spacing:0.1em;">Go to the Leaderboard tab → Click a row to set your name via the SP plugin.</div>
-        </div>
-      </div>
-
-      <!-- Messages area — scrollable, grows upward -->
-      <div class="ct-messages-shell" id="ct-chat-area" style="display:none;">
-        <div class="ct-messages-list" id="ct-messages"></div>
-      </div>
-
-      <!-- Bottom bar — sticky input -->
-      <div class="ct-bottom" id="ct-bottom" style="display:none;">
-        <!-- Reply/edit preview bar -->
-        <div class="ct-reply-bar" id="ct-reply-bar">
-          <div class="ct-reply-bar-content">
-            <div class="ct-reply-bar-line"></div>
-            <span id="ct-reply-text" style="font-size:0.78rem;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
-          </div>
-          <button class="ct-reply-bar-close" onclick="cancelReply()">✕</button>
-        </div>
-        <!-- Emoji picker — pops up above input -->
-        <div class="ct-emoji-panel" id="ct-emoji-panel">
-          <div class="ct-emoji-cats">
-            <button class="ct-emoji-cat active" onclick="showEmojiCat('smileys',this)">😊</button>
-            <button class="ct-emoji-cat" onclick="showEmojiCat('gestures',this)">👋</button>
-            <button class="ct-emoji-cat" onclick="showEmojiCat('fire',this)">🔥</button>
-            <button class="ct-emoji-cat" onclick="showEmojiCat('hearts',this)">❤️</button>
-            <button class="ct-emoji-cat" onclick="showEmojiCat('symbols',this)">⭐</button>
-            <button class="ct-emoji-cat" onclick="showEmojiCat('animals',this)">🐶</button>
-            <button class="ct-emoji-cat" onclick="showEmojiCat('food',this)">🍕</button>
-            <button class="ct-emoji-cat" onclick="showEmojiCat('sports',this)">⚽</button>
-          </div>
-          <div class="ct-emoji-grid" id="ct-emoji-grid"></div>
-        </div>
-        <!-- Input row -->
-        <div class="ct-input-row">
-          <button class="ct-emoji-trigger" onclick="toggleEmojiPicker()" title="Emoji">😊</button>
-          <textarea class="ct-textarea" id="ct-input" placeholder="Type a message…" rows="1"
-            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg();}"
-            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
-          <button class="ct-send-btn" id="ct-send-btn" onclick="sendChatMsg()">➤</button>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
   <div id="plugin-content"></div>
+</div>
+
+<!-- ── CHAT TAB — outside .main so position:fixed fills full width ── -->
+<div id="tab-chat" style="display:none;">
+  <div class="ct-shell">
+
+    <div class="ct-header">
+      <div class="ct-header-info">
+        <div class="ct-header-title">💬 Group Chat</div>
+        <div class="ct-header-sub" id="ct-username-text">— not joined —</div>
+      </div>
+      <div class="ct-header-count" id="ct-online-count"></div>
+    </div>
+
+    <div id="ct-no-user" class="ct-no-user-shell" style="display:none;">
+      <div class="ct-no-user-inner">
+        <div style="font-size:3rem;margin-bottom:1rem;">💬</div>
+        <h3 style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:0.08em;margin-bottom:0.5rem;">JOIN THE CHAT</h3>
+        <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1.5rem;line-height:1.6;">Your leaderboard name is used automatically.<br>Set it on the leaderboard first to chat.</p>
+        <div style="font-size:0.75rem;color:var(--muted);letter-spacing:0.1em;">Go to the Leaderboard tab → set your name via the SP plugin first.</div>
+      </div>
+    </div>
+
+    <div class="ct-messages-shell" id="ct-chat-area" style="display:none;">
+      <div class="ct-messages-list" id="ct-messages"></div>
+    </div>
+
+    <div class="ct-bottom" id="ct-bottom" style="display:none;">
+      <div class="ct-reply-bar" id="ct-reply-bar">
+        <div class="ct-reply-bar-content">
+          <div class="ct-reply-bar-line"></div>
+          <span id="ct-reply-text" style="font-size:0.78rem;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+        </div>
+        <button class="ct-reply-bar-close" onclick="cancelReply()">✕</button>
+      </div>
+      <div class="ct-emoji-panel" id="ct-emoji-panel">
+        <div class="ct-emoji-cats">
+          <button class="ct-emoji-cat active" onclick="showEmojiCat('smileys',this)">😊</button>
+          <button class="ct-emoji-cat" onclick="showEmojiCat('gestures',this)">👋</button>
+          <button class="ct-emoji-cat" onclick="showEmojiCat('fire',this)">🔥</button>
+          <button class="ct-emoji-cat" onclick="showEmojiCat('hearts',this)">❤️</button>
+          <button class="ct-emoji-cat" onclick="showEmojiCat('symbols',this)">⭐</button>
+          <button class="ct-emoji-cat" onclick="showEmojiCat('animals',this)">🐶</button>
+          <button class="ct-emoji-cat" onclick="showEmojiCat('food',this)">🍕</button>
+          <button class="ct-emoji-cat" onclick="showEmojiCat('sports',this)">⚽</button>
+        </div>
+        <div class="ct-emoji-grid" id="ct-emoji-grid"></div>
+      </div>
+      <div class="ct-input-row">
+        <button class="ct-emoji-trigger" onclick="toggleEmojiPicker()" title="Emoji">😊</button>
+        <textarea class="ct-textarea" id="ct-input" placeholder="Type a message…" rows="1"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg();}"
+          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+        <button class="ct-send-btn" id="ct-send-btn" onclick="sendChatMsg()">➤</button>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <!-- ── CHAT TAB ── -->
