@@ -500,6 +500,7 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
 <div class="tabs-container">
   <button class="tab active" onclick="switchTab('lb',this)">🏆 LEADERBOARD</button>
   <button class="tab" onclick="switchTab('war',this)">⚔️ STUDY WAR</button>
+  <button class="tab" onclick="switchTab('chat',this)">💬 GROUP CHAT</button>
   <div id="plugin-tabs"></div>
 </div>
 
@@ -536,6 +537,9 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
     </div>
 
     <div id="lb-loading" class="loading">LOADING LEADERBOARD</div>
+    <div id="jump-rank-bar" style="display:none;margin-bottom:1rem;display:flex;justify-content:flex-end;">
+      <button onclick="jumpToMyRank()" style="background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:4px;color:#000;font-family:'Syne',sans-serif;font-weight:700;font-size:0.75rem;letter-spacing:0.1em;padding:0.5rem 1.2rem;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">📍 My Rank</button>
+    </div>
     <table class="lb-table" id="lb-table" style="display:none;">
       <thead><tr>
         <th style="width:60px">RANK</th>
@@ -586,8 +590,178 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
     </div>
   </div>
 
+  <!-- CHAT TAB -->
+  <div id="tab-chat" style="display:none;">
+    <div class="chat-tab-wrap">
+      <div class="chat-tab-header">GROUP <span style="color:var(--accent)">CHAT</span></div>
+      <div class="chat-tab-sub" id="ct-username-bar">— SET YOUR NAME TO CHAT —</div>
+      <div id="ct-no-user" class="ct-no-user" style="display:none;">
+        <h3>💬 Join the Chat</h3>
+        <p>Enter your name to start chatting with the group.</p>
+        <div class="ct-user-setup">
+          <input class="ct-user-input" id="ct-name-input" placeholder="Your name…" maxlength="30" onkeydown="if(event.key==='Enter')saveChatUsername()">
+          <button class="ct-user-btn" onclick="saveChatUsername()">JOIN</button>
+        </div>
+      </div>
+      <div id="ct-chat-area" style="display:none;">
+        <div class="chat-tab-msgs" id="ct-messages"></div>
+        <div class="ct-reply-bar" id="ct-reply-bar">
+          <span id="ct-reply-text">↩ Replying to...</span>
+          <button class="ct-reply-bar-close" onclick="cancelReply()">✕</button>
+        </div>
+        <div class="ct-emoji-bar">
+          <span class="ct-emoji-pick" onclick="quickReactLast('👍')">👍</span>
+          <span class="ct-emoji-pick" onclick="quickReactLast('🔥')">🔥</span>
+          <span class="ct-emoji-pick" onclick="quickReactLast('💪')">💪</span>
+          <span class="ct-emoji-pick" onclick="quickReactLast('😂')">😂</span>
+          <span class="ct-emoji-pick" onclick="quickReactLast('❤️')">❤️</span>
+          <span class="ct-emoji-pick" onclick="quickReactLast('👑')">👑</span>
+        </div>
+        <div class="ct-input-row">
+          <button class="ct-emoji-trigger" onclick="toggleEmojiPicker()" title="Emoji">😊</button>
+          <textarea class="ct-textarea" id="ct-input" placeholder="Type a message…" rows="1"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMsg();}"
+            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px'"></textarea>
+          <button class="ct-send-btn" id="ct-send-btn" onclick="sendChatMsg()">➤</button>
+        </div>
+        <!-- Full Emoji Picker Panel -->
+        <div class="ct-emoji-panel" id="ct-emoji-panel">
+          <div class="ct-emoji-cats">
+            <button class="ct-emoji-cat active" onclick="showEmojiCat('smileys',this)">😊</button>
+            <button class="ct-emoji-cat" onclick="showEmojiCat('gestures',this)">👋</button>
+            <button class="ct-emoji-cat" onclick="showEmojiCat('fire',this)">🔥</button>
+            <button class="ct-emoji-cat" onclick="showEmojiCat('hearts',this)">❤️</button>
+            <button class="ct-emoji-cat" onclick="showEmojiCat('symbols',this)">⭐</button>
+            <button class="ct-emoji-cat" onclick="showEmojiCat('animals',this)">🐶</button>
+            <button class="ct-emoji-cat" onclick="showEmojiCat('food',this)">🍕</button>
+            <button class="ct-emoji-cat" onclick="showEmojiCat('sports',this)">⚽</button>
+          </div>
+          <div class="ct-emoji-grid" id="ct-emoji-grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="plugin-content"></div>
 </div>
+
+<!-- ── CHAT TAB CONTENT ── -->
+<style>
+#tab-chat { display:none; }
+.chat-tab-wrap { max-width:700px; margin:0 auto; }
+.chat-tab-header { font-family:'Bebas Neue',sans-serif; font-size:2.5rem; letter-spacing:0.08em; margin-bottom:0.3rem; }
+.chat-tab-sub { color:var(--muted); font-size:0.8rem; letter-spacing:0.1em; margin-bottom:1.5rem; }
+.chat-tab-msgs { display:flex; flex-direction:column; gap:0.8rem; min-height:300px; margin-bottom:1.2rem; }
+.ct-msg { display:flex; flex-direction:column; gap:0.3rem; animation:fadeSlide 0.3s ease both; }
+.ct-msg.mine { align-items:flex-end; }
+.ct-msg-header { display:flex; align-items:center; gap:0.5rem; font-size:0.68rem; color:var(--muted); }
+.ct-msg.mine .ct-msg-header { flex-direction:row-reverse; }
+.ct-msg-name { font-family:'Syne',sans-serif; font-weight:600; font-size:0.72rem; }
+.ct-bubble-wrap { display:flex; flex-direction:column; max-width:72%; }
+.ct-msg.mine .ct-bubble-wrap { align-items:flex-end; }
+.ct-reply-preview { font-size:0.68rem; color:var(--muted); background:rgba(255,255,255,0.04); border-left:2px solid var(--accent); padding:0.25rem 0.6rem; border-radius:3px; margin-bottom:0.2rem; }
+.ct-bubble { padding:0.6rem 0.9rem; border-radius:12px; font-size:0.84rem; line-height:1.45; word-break:break-word; position:relative; cursor:default; }
+.ct-msg:not(.mine) .ct-bubble { background:var(--surface2); border:1px solid var(--border); border-bottom-left-radius:2px; }
+.ct-msg.mine .ct-bubble { background:linear-gradient(135deg,rgba(232,197,71,0.2),rgba(255,107,53,0.15)); border:1px solid rgba(232,197,71,0.25); border-bottom-right-radius:2px; }
+.ct-edited { font-size:0.6rem; color:var(--muted); margin-top:2px; }
+.ct-reactions { display:flex; flex-wrap:wrap; gap:0.3rem; margin-top:0.3rem; }
+.ct-reaction { display:flex; align-items:center; gap:3px; background:var(--surface2); border:1px solid var(--border); border-radius:20px; padding:2px 8px; font-size:0.75rem; cursor:pointer; transition:all 0.15s; user-select:none; }
+.ct-reaction:hover { border-color:var(--accent); background:rgba(232,197,71,0.08); }
+.ct-reaction.mine { border-color:rgba(232,197,71,0.4); background:rgba(232,197,71,0.08); }
+.ct-reaction-count { font-family:'Syne',sans-serif; font-size:0.68rem; color:var(--muted); }
+.ct-actions { display:none; flex-direction:row; gap:0.4rem; margin-top:0.25rem; }
+.ct-msg:hover .ct-actions { display:flex; }
+.ct-msg.mine .ct-actions { justify-content:flex-end; }
+.ct-action-btn { background:var(--surface2); border:1px solid var(--border); border-radius:4px; color:var(--muted); font-size:0.65rem; padding:2px 7px; cursor:pointer; transition:all 0.15s; font-family:'Syne',sans-serif; }
+.ct-action-btn:hover { border-color:var(--accent); color:var(--accent); }
+.ct-action-btn.danger:hover { border-color:var(--red); color:var(--red); }
+.ct-reply-bar { background:rgba(232,197,71,0.06); border:1px solid rgba(232,197,71,0.2); border-radius:6px; padding:0.5rem 0.8rem; margin-bottom:0.6rem; display:none; align-items:center; justify-content:space-between; font-size:0.75rem; color:var(--muted); }
+.ct-reply-bar.show { display:flex; }
+.ct-reply-bar-close { background:none; border:none; color:var(--muted); cursor:pointer; font-size:1rem; }
+.ct-input-row { display:flex; gap:0.6rem; align-items:flex-end; }
+.ct-textarea { flex:1; background:var(--surface); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:0.84rem; padding:0.65rem 1rem; outline:none; resize:none; transition:border-color 0.2s; line-height:1.4; }
+.ct-textarea:focus { border-color:rgba(232,197,71,0.4); }
+.ct-send-btn { width:40px; height:40px; border-radius:8px; background:var(--accent); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.1rem; transition:all 0.2s; flex-shrink:0; }
+.ct-send-btn:hover { background:#f0cc55; transform:scale(1.05); }
+.ct-send-btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+.ct-emoji-trigger {
+  width: 40px; height: 40px;
+  border-radius: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 1.2rem;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  align-self: flex-end;
+}
+.ct-emoji-trigger:hover { border-color: var(--accent); background: rgba(232,197,71,0.08); }
+.ct-emoji-panel {
+  display: none;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 0.6rem;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.ct-emoji-panel.open { display: flex; }
+.ct-emoji-cats {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+  overflow-x: auto;
+}
+.ct-emoji-cats::-webkit-scrollbar { height: 0; }
+.ct-emoji-cat {
+  background: none;
+  border: none;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  padding: 4px 6px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.ct-emoji-cat:hover { opacity: 1; background: rgba(232,197,71,0.1); }
+.ct-emoji-cat.active { opacity: 1; background: rgba(232,197,71,0.15); outline: 1px solid rgba(232,197,71,0.3); }
+.ct-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  padding: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.ct-emoji-grid::-webkit-scrollbar { width: 4px; }
+.ct-emoji-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.ct-emoji-item {
+  font-size: 1.3rem;
+  padding: 5px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.1s;
+  line-height: 1;
+  border: none;
+  background: none;
+}
+.ct-emoji-item:hover { background: rgba(232,197,71,0.12); transform: scale(1.2); }
+.ct-emoji-bar { display:flex; gap:0.4rem; margin-bottom:0.5rem; flex-wrap:wrap; }
+.ct-emoji-pick { background:var(--surface2); border:1px solid var(--border); border-radius:20px; padding:3px 10px; font-size:1rem; cursor:pointer; transition:all 0.15s; }
+.ct-emoji-pick:hover { border-color:var(--accent); transform:scale(1.15); }
+.ct-no-user { text-align:center; padding:3rem 2rem; color:var(--muted); }
+.ct-no-user h3 { font-family:'Bebas Neue',sans-serif; font-size:1.5rem; margin-bottom:0.5rem; color:var(--text); }
+.ct-user-setup { display:flex; gap:0.6rem; margin-top:1rem; }
+.ct-user-input { flex:1; background:var(--surface2); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:'JetBrains Mono',monospace; font-size:0.84rem; padding:0.6rem 1rem; outline:none; }
+.ct-user-input:focus { border-color:var(--accent); }
+.ct-user-btn { background:var(--accent); border:none; border-radius:6px; color:#000; font-family:'Syne',sans-serif; font-weight:700; font-size:0.8rem; padding:0.6rem 1.2rem; cursor:pointer; }
+</style>
 
 <!-- ── WAR INFO MODAL ── -->
 <div class="war-info-overlay" id="war-info-overlay" onclick="closeWarInfo(event)">
@@ -723,9 +897,28 @@ document.addEventListener('keydown', e => {
 function switchTab(name, el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  document.getElementById('tab-lb').style.display = name==='lb'?'':'none';
-  document.getElementById('tab-war').style.display = name==='war'?'':'none';
-  if(name==='war') loadWar();
+  document.getElementById('tab-lb').style.display   = name==='lb'  ? '' : 'none';
+  document.getElementById('tab-war').style.display  = name==='war' ? '' : 'none';
+  document.getElementById('tab-chat').style.display = name==='chat'? '' : 'none';
+  if(name==='war')  loadWar();
+  if(name==='chat') initChatTab();
+}
+
+// ── JUMP TO MY RANK ────────────────────────────────────────────────────────
+function jumpToMyRank(){
+  const myName = localStorage.getItem('sp_leaderboard_username');
+  if(!myName) return;
+  const rows = document.querySelectorAll('#lb-body .lb-row');
+  for(const row of rows){
+    const uname = row.querySelector('.uname')?.textContent?.trim();
+    if(uname === myName){
+      row.scrollIntoView({ behavior:'smooth', block:'center' });
+      row.style.outline = '2px solid var(--accent)';
+      row.style.borderRadius = '4px';
+      setTimeout(() => row.style.outline = '', 2000);
+      return;
+    }
+  }
 }
 
 // ── PERSONAL QUOTE ─────────────────────────────────────────────────────────
@@ -780,6 +973,12 @@ function renderLB({users, today}){
   const loading = document.getElementById('lb-loading');
   const table   = document.getElementById('lb-table');
   const empty   = document.getElementById('lb-empty');
+  const jumpBar = document.getElementById('jump-rank-bar');
+
+  // Show jump button if user is in leaderboard
+  const myName = localStorage.getItem('sp_leaderboard_username');
+  const myIdx  = myName ? users.findIndex(u => u.username === myName) : -1;
+  if(jumpBar) jumpBar.style.display = myIdx >= 0 ? 'flex' : 'none';
 
   if(!users.length){
     loading.style.display='none'; table.style.display='none'; empty.style.display='';
@@ -810,14 +1009,15 @@ function renderLB({users, today}){
     const uid = 'u'+i;
     const dotClass = u.isOnline ? 'online' : 'offline';
     const rowStyle = !isActive ? 'opacity:0.5;' : '';
-    return `<tr class="lb-row" style="animation-delay:${i*0.05}s;${rowStyle}" onclick="toggleInsight('${uid}','${esc(u.username)}')">
+    const isMe = myName && u.username === myName;
+    return `<tr class="lb-row" style="animation-delay:${i*0.05}s;${rowStyle}${isMe?'outline:1px solid rgba(232,197,71,0.3);':''}" onclick="toggleInsight('${uid}','${esc(u.username)}')">
       <td><div class="rank-badge ${rc}">${rl}</div></td>
       <td><div class="user-cell">
         <div class="avatar-wrap">
           <div class="avatar" style="background:${color}">${initials(u.username)}</div>
           <div class="online-dot ${dotClass}"></div>
         </div>
-        <div class="uname">${esc(u.username)}</div>
+        <div class="uname">${esc(u.username)}${isMe?' <span style="font-size:0.6rem;color:var(--accent);letter-spacing:0.1em;">YOU</span>':''}</div>
       </div></td>
       <td><div class="bar-wrap">
         <div class="bar"><div class="bar-fill" style="width:${isActive?(u.todayMs/maxMs*100).toFixed(1):0}%"></div></div>
@@ -1089,139 +1289,308 @@ window.StudyForgePlugins = {
 loadLB();
 setInterval(loadLB, 30000);
 
-// ── CHAT ──────────────────────────────────────────────────────────────────
-let chatOpen = false;
-let lastMsgId = 0;
-let chatPollTimer = null;
-let unreadCount = 0;
-let chatInitialized = false;
+// ── CHAT TAB ──────────────────────────────────────────────────────────────
+let ctLastId = 0;
+let ctPollTimer = null;
+let ctReplyTo = null; // { id, username, message }
+let ctEditId = null;
+let ctAllMessages = [];
+let ctInited = false;
 
-function toggleChat() {
-  chatOpen = !chatOpen;
-  document.getElementById('chat-panel').classList.toggle('open', chatOpen);
-  if (chatOpen) {
-    unreadCount = 0;
-    updateUnreadBadge();
-    if (!chatInitialized) {
-      chatInitialized = true;
-      if (!getChatName()) { askChatName(); }
-      else { loadChat(true); }
-    }
-    setTimeout(() => document.getElementById('chat-input')?.focus(), 300);
-    scrollChatBottom();
-  }
-}
-function updateUnreadBadge() {
-  const el = document.getElementById('chat-unread');
-  if (unreadCount > 0) { el.textContent = unreadCount > 9 ? '9+' : unreadCount; el.classList.add('show'); }
-  else { el.classList.remove('show'); }
-}
-async function loadChat(initial = false) {
-  try {
-    const res = await fetch(`${API}/api/chat?since=${lastMsgId}`);
-    const data = await res.json();
-    if (data.messages?.length) {
-      renderMessages(data.messages, initial);
-      lastMsgId = data.messages[data.messages.length - 1].id;
-      if (!chatOpen && !initial) { unreadCount += data.messages.length; updateUnreadBadge(); }
-    } else if (initial) {
-      document.getElementById('chat-messages').innerHTML = '<div class="chat-empty">No messages yet. Say hi! 👋</div>';
-    }
-  } catch(e) { console.warn('Chat load failed:', e); }
-}
-function renderMessages(messages, replace = false) {
-  const container = document.getElementById('chat-messages');
-  const myName = localStorage.getItem('sp_leaderboard_username') || '';
-  const wasAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 60;
-  if (replace) container.innerHTML = '';
-  messages.forEach(m => {
-    const isMine = m.username === myName;
-    const color = avatarColor(m.username);
-    const time = new Date(m.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-    const div = document.createElement('div');
-    div.className = `chat-msg ${isMine ? 'mine' : ''}`;
-    div.innerHTML = `
-      <div class="chat-msg-header">
-        <div class="chat-msg-name" style="color:${color}">${esc(m.username)}</div>
-        <div class="chat-time">${time}</div>
-      </div>
-      <div class="chat-bubble">${esc(m.message)}</div>`;
-    container.appendChild(div);
-  });
-  if (replace || wasAtBottom) scrollChatBottom();
-}
-function scrollChatBottom() {
-  const c = document.getElementById('chat-messages');
-  if (c) setTimeout(() => c.scrollTop = c.scrollHeight, 50);
-}
-function getChatName() {
+function getChatUser() {
   return localStorage.getItem('sp_leaderboard_username') || localStorage.getItem('chat_username') || null;
 }
-function askChatName() {
-  const container = document.getElementById('chat-messages');
-  container.innerHTML = `
-    <div class="chat-no-user" style="padding:1.5rem 1rem;">
-      <div style="font-size:1.5rem;margin-bottom:0.8rem;">👋</div>
-      <div style="margin-bottom:1rem;color:var(--text);font-size:0.85rem;">Enter your name to start chatting:</div>
-      <input id="chat-name-input" class="chat-input" style="width:100%;margin-bottom:0.8rem;display:block;"
-        placeholder="Your name…" maxlength="30"
-        onkeydown="if(event.key==='Enter')saveChatName()">
-      <button class="chat-send" style="width:100%;border-radius:6px;height:36px;font-size:0.85rem;font-family:'Syne',sans-serif;font-weight:600;"
-        onclick="saveChatName()">JOIN CHAT</button>
-    </div>`;
-  setTimeout(() => document.getElementById('chat-name-input')?.focus(), 100);
+
+function saveChatUsername() {
+  const val = document.getElementById('ct-name-input')?.value?.trim();
+  if (!val) return;
+  localStorage.setItem('chat_username', val);
+  initChatTab();
 }
-function saveChatName() {
-  const input = document.getElementById('chat-name-input');
-  const name = input?.value?.trim();
-  if (!name) return;
-  localStorage.setItem('chat_username', name);
-  document.getElementById('chat-messages').innerHTML = '<div class="chat-empty">Loading…</div>';
-  chatInitialized = false; lastMsgId = 0;
-  loadChat(true);
+
+function initChatTab() {
+  const user = getChatUser();
+  const bar = document.getElementById('ct-username-bar');
+  if (bar) bar.textContent = user ? `Chatting as ${user}` : '— SET YOUR NAME TO CHAT —';
+
+  if (!user) {
+    document.getElementById('ct-no-user').style.display = '';
+    document.getElementById('ct-chat-area').style.display = 'none';
+    return;
+  }
+  document.getElementById('ct-no-user').style.display = 'none';
+  document.getElementById('ct-chat-area').style.display = '';
+
+  if (!ctInited) {
+    ctInited = true;
+    loadChatMessages(true);
+    if (!ctPollTimer) ctPollTimer = setInterval(() => loadChatMessages(false), 4000);
+  }
 }
-async function sendChat() {
-  const myName = getChatName();
-  const input = document.getElementById('chat-input');
-  const btn = document.getElementById('chat-send-btn');
-  const msg = input?.value?.trim();
-  if (!myName) { askChatName(); return; }
-  if (!msg) return;
-  btn.disabled = true; input.value = ''; input.style.height = 'auto';
+
+async function loadChatMessages(initial = false) {
   try {
-    await fetch(`${API}/api/chat`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: myName, message: msg }),
-    });
-    await loadChat(false);
+    const res = await fetch(`${API}/api/chat?since=${initial ? 0 : ctLastId}`);
+    const data = await res.json();
+    if (initial) {
+      ctAllMessages = data.messages || [];
+      ctLastId = ctAllMessages.length ? ctAllMessages[ctAllMessages.length-1].id : 0;
+      renderAllMessages();
+    } else if (data.messages?.length) {
+      ctAllMessages = [...ctAllMessages, ...data.messages];
+      ctLastId = data.messages[data.messages.length-1].id;
+      data.messages.forEach(m => appendMessage(m));
+      scrollChatTab();
+    }
+  } catch(e) {}
+}
+
+function renderAllMessages() {
+  const container = document.getElementById('ct-messages');
+  container.innerHTML = '';
+  if (!ctAllMessages.length) {
+    container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem;font-size:0.85rem;">No messages yet. Say hi! 👋</div>';
+    return;
+  }
+  ctAllMessages.forEach(m => appendMessage(m, false));
+  scrollChatTab();
+}
+
+function appendMessage(m, scroll=true) {
+  const container = document.getElementById('ct-messages');
+  const me = getChatUser();
+  const isMine = m.username === me;
+  const color = avatarColor(m.username);
+  const time = new Date(m.created_at).toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+
+  // Find reply-to message
+  let replyHtml = '';
+  if (m.reply_to) {
+    const orig = ctAllMessages.find(x => x.id === m.reply_to);
+    if (orig) replyHtml = `<div class="ct-reply-preview">↩ <strong>${esc(orig.username)}</strong>: ${esc(orig.message.slice(0,60))}${orig.message.length>60?'…':''}</div>`;
+  }
+
+  // Reactions
+  const reactions = m.reactions || {};
+  const reactHtml = Object.entries(reactions).map(([emoji, users]) => {
+    const myReact = users.includes(me);
+    return `<span class="ct-reaction${myReact?' mine':''}" onclick="toggleReact(${m.id},'${emoji}')">${emoji} <span class="ct-reaction-count">${users.length}</span></span>`;
+  }).join('');
+
+  // Action buttons
+  const replyBtn = `<button class="ct-action-btn" onclick="startReply(${m.id},'${esc(m.username)}','${esc(m.message.slice(0,40))}')">↩ Reply</button>`;
+  const reactBtn = `<button class="ct-action-btn" onclick="showEmojiPick(${m.id})">😊</button>`;
+  const editBtn  = isMine ? `<button class="ct-action-btn" onclick="startEdit(${m.id},'${esc(m.message)}')">✏️ Edit</button>` : '';
+  const delBtn   = isMine ? `<button class="ct-action-btn danger" onclick="deleteMsg(${m.id})">🗑️</button>` : '';
+
+  const div = document.createElement('div');
+  div.className = `ct-msg${isMine?' mine':''}`;
+  div.id = `ctmsg-${m.id}`;
+  div.innerHTML = `
+    <div class="ct-msg-header">
+      <div class="ct-msg-name" style="color:${color}">${esc(m.username)}</div>
+      <div style="font-size:0.6rem;color:var(--muted)">${time}</div>
+    </div>
+    <div class="ct-bubble-wrap">
+      ${replyHtml}
+      <div class="ct-bubble">${esc(m.message)}${m.edited?'<div class="ct-edited">edited</div>':''}</div>
+      ${reactHtml ? `<div class="ct-reactions">${reactHtml}</div>` : `<div class="ct-reactions" id="ctreact-${m.id}"></div>`}
+      <div class="ct-actions">${replyBtn}${reactBtn}${editBtn}${delBtn}</div>
+    </div>`;
+  container.appendChild(div);
+  if (scroll) scrollChatTab();
+}
+
+function scrollChatTab() {
+  const c = document.getElementById('ct-messages');
+  if (c) setTimeout(() => c.scrollTop = c.scrollHeight, 50);
+}
+
+function startReply(id, username, preview) {
+  ctReplyTo = { id, username, message: preview };
+  ctEditId = null;
+  const bar = document.getElementById('ct-reply-bar');
+  document.getElementById('ct-reply-text').textContent = `↩ Replying to ${username}: ${preview}`;
+  bar.classList.add('show');
+  document.getElementById('ct-input').focus();
+}
+
+function cancelReply() {
+  ctReplyTo = null;
+  ctEditId = null;
+  document.getElementById('ct-reply-bar').classList.remove('show');
+  document.getElementById('ct-reply-text').textContent = '↩ Replying to...';
+  document.getElementById('ct-input').value = '';
+}
+
+function startEdit(id, currentMsg) {
+  ctEditId = id;
+  ctReplyTo = null;
+  document.getElementById('ct-reply-bar').classList.add('show');
+  document.getElementById('ct-reply-text').textContent = `✏️ Editing message`;
+  const input = document.getElementById('ct-input');
+  input.value = currentMsg;
+  input.focus();
+}
+
+async function sendChatMsg() {
+  const me = getChatUser();
+  const input = document.getElementById('ct-input');
+  const btn = document.getElementById('ct-send-btn');
+  const msg = input.value.trim();
+  if (!me || !msg) return;
+
+  btn.disabled = true;
+  input.value = '';
+  input.style.height = 'auto';
+
+  try {
+    if (ctEditId) {
+      // Edit existing message
+      const r = await fetch(`${API}/api/chat/${ctEditId}`, {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ username: me, message: msg })
+      });
+      if (r.ok) {
+        const data = await r.json();
+        // Update in local array and re-render
+        const idx = ctAllMessages.findIndex(m => m.id === ctEditId);
+        if (idx >= 0) ctAllMessages[idx] = data.message;
+        const el = document.getElementById(`ctmsg-${ctEditId}`);
+        if (el) el.remove();
+        // Re-insert at same position
+        renderAllMessages();
+      }
+      cancelReply();
+    } else {
+      // New message
+      const r = await fetch(`${API}/api/chat`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ username: me, message: msg, reply_to: ctReplyTo?.id || null })
+      });
+      if (r.ok) {
+        const data = await r.json();
+        ctAllMessages.push(data.message);
+        ctLastId = data.message.id;
+        appendMessage(data.message);
+      }
+      cancelReply();
+    }
   } catch(e) { console.warn('Send failed:', e); }
   finally { btn.disabled = false; input.focus(); }
 }
-function startChatPoll() {
-  chatPollTimer = setInterval(() => { if (chatInitialized) loadChat(false); }, 5000);
+
+async function deleteMsg(id) {
+  const me = getChatUser();
+  if (!confirm('Delete this message?')) return;
+  const r = await fetch(`${API}/api/chat/${id}`, {
+    method: 'DELETE',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ username: me })
+  });
+  if (r.ok) {
+    ctAllMessages = ctAllMessages.filter(m => m.id !== id);
+    document.getElementById(`ctmsg-${id}`)?.remove();
+  }
 }
-startChatPoll();
+
+async function toggleReact(id, emoji) {
+  const me = getChatUser();
+  if (!me) return;
+  const r = await fetch(`${API}/api/chat/${id}/react`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ username: me, emoji })
+  });
+  if (r.ok) {
+    const data = await r.json();
+    const idx = ctAllMessages.findIndex(m => m.id === id);
+    if (idx >= 0) ctAllMessages[idx] = data.message;
+    // Re-render just that message
+    const el = document.getElementById(`ctmsg-${id}`);
+    if (el) {
+      const tempDiv = document.createElement('div');
+      document.getElementById('ct-messages').insertBefore(tempDiv, el);
+      el.remove();
+      appendMessage(data.message, false);
+      const newEl = document.getElementById(`ctmsg-${id}`);
+      document.getElementById('ct-messages').insertBefore(newEl, tempDiv);
+      tempDiv.remove();
+    }
+  }
+}
+
+function showEmojiPick(id) {
+  const EMOJIS = ['👍','👎','🔥','💪','😂','❤️','👑','🎯','💡','😭'];
+  const existing = document.getElementById(`emoji-picker-${id}`);
+  if (existing) { existing.remove(); return; }
+  const picker = document.createElement('div');
+  picker.id = `emoji-picker-${id}`;
+  picker.style.cssText = 'position:absolute;z-index:100;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;display:flex;gap:6px;flex-wrap:wrap;max-width:200px;box-shadow:0 8px 24px rgba(0,0,0,0.4);';
+  picker.innerHTML = EMOJIS.map(e => `<span style="font-size:1.2rem;cursor:pointer;padding:2px;" onclick="toggleReact(${id},'${e}');this.parentElement.remove()">${e}</span>`).join('');
+  const msgEl = document.getElementById(`ctmsg-${id}`);
+  if (msgEl) { msgEl.style.position='relative'; msgEl.appendChild(picker); }
+  setTimeout(() => { document.addEventListener('click', () => picker.remove(), {once:true}); }, 100);
+}
+
+// ── EMOJI PICKER ───────────────────────────────────────────────────────────
+const EMOJI_CATS = {
+  smileys:  ['😀','😂','🤣','😊','😍','🥰','😘','😎','🤩','🥳','😭','😢','😤','😠','🤯','🥺','😴','🤔','🙄','😏','😒','😌','🤗','🤫','🫡','😶','😑','🙃','🫠','😵','🤪','😜','😝','🤑','🤤','🥴','😬','🤥','🫢','🫣'],
+  gestures: ['👋','🤚','✋','🖖','🤙','👈','👉','👆','👇','☝️','👍','👎','✊','👊','🤛','🤜','🤞','✌️','🤟','🤘','👌','🤌','🤏','💪','🦾','🙏','👏','🫶','🫰','🫵'],
+  fire:     ['🔥','💥','⚡','✨','🌟','💫','⭐','🌈','🎯','🎪','🎭','🎨','🎬','🎤','🎧','🎵','🎶','🏆','🥇','🥈','🥉','🎖️','🏅','👑','💎','🔑','⚔️','🛡️','🚀','💡'],
+  hearts:   ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💕','💞','💓','💗','💖','💘','💝','💟','❣️','💔','🫀','♥️','💌','💋','😻','🫦','💑','👫','👬','👭'],
+  symbols:  ['⭐','🌟','💫','✨','🔥','💯','✅','❌','⚠️','🔔','💬','👀','🎉','🎊','🎈','🎁','🏆','🥇','🔝','💪','🙌','👏','🤝','🫱','🫲','🫳','🫴','⚡','🌊','💧'],
+  animals:  ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🦝','🐺','🦦','🦥','🐗','🦄','🐴','🦌','🦬','🐘','🦏','🦛','🐪','🦒','🦓'],
+  food:     ['🍕','🍔','🌮','🌯','🥗','🍜','🍣','🍱','🍛','🍝','🥪','🥙','🌭','🍟','🍿','🧆','🥚','🍳','🥞','🧇','🥓','🥩','🍗','🍖','🦴','🥣','🥫','🧂','🥡','🍱'],
+  sports:   ['⚽','🏀','🏈','⚾','🥎','🎾','🏐','🏉','🥏','🎱','🏓','🏸','🏒','🥍','🏑','🏏','🪃','🏹','🎣','🥊','🥋','🎽','🛹','🛼','🛷','⛸️','🏋️','🤼','🤸','🤺'],
+};
+
+let emojiPickerOpen = false;
+
+function toggleEmojiPicker() {
+  emojiPickerOpen = !emojiPickerOpen;
+  const panel = document.getElementById('ct-emoji-panel');
+  panel.classList.toggle('open', emojiPickerOpen);
+  if (emojiPickerOpen) showEmojiCat('smileys', document.querySelector('.ct-emoji-cat'));
+}
+
+function showEmojiCat(cat, btn) {
+  document.querySelectorAll('.ct-emoji-cat').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const grid = document.getElementById('ct-emoji-grid');
+  grid.innerHTML = (EMOJI_CATS[cat] || []).map(e =>
+    `<button class="ct-emoji-item" onclick="insertEmoji('${e}')">${e}</button>`
+  ).join('');
+}
+
+function insertEmoji(emoji) {
+  const input = document.getElementById('ct-input');
+  const start = input.selectionStart;
+  const end = input.selectionEnd;
+  const val = input.value;
+  input.value = val.slice(0, start) + emoji + val.slice(end);
+  input.selectionStart = input.selectionEnd = start + emoji.length;
+  input.focus();
+  input.dispatchEvent(new Event('input')); // trigger height resize
+}
+
+// Close emoji picker when clicking outside
+document.addEventListener('click', (e) => {
+  if (emojiPickerOpen && !e.target.closest('.ct-emoji-panel') && !e.target.closest('.ct-emoji-trigger')) {
+    emojiPickerOpen = false;
+    document.getElementById('ct-emoji-panel')?.classList.remove('open');
+  }
+});
+
+function quickReactLast(emoji) {
+  if (!ctAllMessages.length) return;
+  const last = ctAllMessages[ctAllMessages.length - 1];
+  toggleReact(last.id, emoji);
+}
 </script>
 
-<button class="chat-fab" onclick="toggleChat()" title="Group Chat">
-  💬
-  <div class="chat-unread" id="chat-unread"></div>
-</button>
-<div class="chat-panel" id="chat-panel">
-  <div class="chat-header">
-    <div class="chat-title">💬 GROUP CHAT</div>
-    <button class="chat-close" onclick="toggleChat()">✕</button>
-  </div>
-  <div class="chat-messages" id="chat-messages">
-    <div class="chat-empty">Loading messages…</div>
-  </div>
-  <div class="chat-input-wrap" id="chat-input-wrap">
-    <textarea class="chat-input" id="chat-input" placeholder="Type a message…" rows="1"
-      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"
-      oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,80)+'px'"></textarea>
-    <button class="chat-send" id="chat-send-btn" onclick="sendChat()">➤</button>
-  </div>
-</div>
 
 </body>
 </html>
