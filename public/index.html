@@ -722,7 +722,7 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  padding: 1rem 1.5rem;
+  padding: 0.6rem 1.2rem;
   scroll-behavior: smooth;
 }
 .ct-messages-shell::-webkit-scrollbar { width: 4px; }
@@ -732,8 +732,8 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
 .ct-messages-list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding-top: 1rem;
+  gap: 0.25rem;
+  padding-top: 0.5rem;
 }
 
 /* Date separators */
@@ -750,12 +750,12 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
 .ct-date-sep::before,.ct-date-sep::after { content:''; flex:1; height:1px; background:var(--border); }
 
 /* Action toolbar — floats beside the bubble, never moves content */
-.ct-msg { display:flex; flex-direction:column; gap:0.2rem; animation:ctSlideIn 0.2s ease both; width:100%; }
+.ct-msg { display:flex; flex-direction:column; gap:0.1rem; animation:ctSlideIn 0.2s ease both; width:100%; }
 .ct-msg.mine { align-items:flex-end; }
 .ct-msg:not(.mine) { align-items:flex-start; }
 @keyframes ctSlideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
 
-.ct-msg-header { display:flex; align-items:center; gap:0.4rem; font-size:0.65rem; color:var(--muted); padding:0 0.3rem; }
+.ct-msg-header { display:flex; align-items:center; gap:0.4rem; font-size:0.6rem; color:var(--muted); padding:0 0.2rem; }
 .ct-msg.mine .ct-msg-header { flex-direction:row-reverse; }
 .ct-msg-name { font-family:'Syne',sans-serif; font-weight:600; font-size:0.7rem; }
 .ct-msg-time { font-size:0.6rem; color:var(--muted); opacity:.7; }
@@ -775,11 +775,10 @@ body::after { content:''; position:fixed; top:-50%; left:-20%; width:60%; height
 }
 
 .ct-bubble {
-  padding:0.55rem 0.9rem;
-  border-radius:14px;
-  font-size:0.84rem; line-height:1.5;
+  padding:0.3rem 0.75rem;
+  border-radius:12px;
+  font-size:0.76rem; line-height:1.35;
   word-break:break-word;
-  position:relative;
 }
 .ct-msg:not(.mine) .ct-bubble {
   background:var(--surface2);
